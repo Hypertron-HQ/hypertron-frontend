@@ -1,0 +1,43 @@
+{
+  "links": [
+    {
+      "id": "plink_demo_001",
+      "url": "https://www.hypertron.space/pay/plink_demo_001",
+      "amount": "245",
+      "purpose": "Q2 Retainer",
+      "clientName": "Northwind",
+      "workflowStage": "approved",
+      "linkMemo": "HYPER-245",
+      "paidAt": "2026-04-25T11:12:00.000Z",
+      "paymentTxHash": "a19cf1f5f2aa3f73db51f9a2a80e1137a21fe6e66e190fd989d3c4f8b8c33811",
+      "commitmentTxHash": "f1d2d2f924e986ac86fdf7b36c94bcdf32beec15a6f8f5f9c2b7e6d9d8c7b6a5",
+      "createdAt": "2026-04-25T10:01:00.000Z"
+    },
+    {
+      "id": "plink_demo_002",
+      "url": "https://www.hypertron.space/pay/plink_demo_002",
+      "amount": null,
+      "purpose": "Any amount support",
+      "clientName": null,
+      "workflowStage": "open",
+      "linkMemo": "HYPER-ANY",
+      "paidAt": null,
+      "paymentTxHash": null,
+      "commitmentTxHash": null,
+      "createdAt": "2026-04-24T08:00:00.000Z"
+    },
+    {
+      "id": "plink_demo_003",
+      "url": "https://www.hypertron.space/pay/plink_demo_003",
+      "amount": "75.5",
+      "purpose": "Pilot Deposit",
+      "clientName": "Stacked Labs",
+      "workflowStage": "pending",
+      "linkMemo": "HYPER-75",
+      "paidAt": null,
+      "paymentTxHash": null,
+      "commitmentTxHash": null,
+      "createdAt": "2026-04-23T07:30:00.000Z"
+    }
+  ]
+}

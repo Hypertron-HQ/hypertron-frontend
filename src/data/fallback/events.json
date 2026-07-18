@@ -1,0 +1,26 @@
+{
+  "events": [
+    {
+      "linkId": "plink_demo_001",
+      "businessId": "demo-business-001",
+      "amount": "245.00",
+      "workflowStage": "KYC Complete",
+      "paidAt": "2026-04-25T11:12:00.000Z",
+      "commitmentId": "2f3a3d1f8bbce31d3f9d8a0f8428b8d5b7f3c9e8d4a1b6c2d7e9f0a1b2c3d4e5"
+    },
+    {
+      "linkId": "plink_demo_002",
+      "businessId": "demo-business-001",
+      "amount": "980.00",
+      "workflowStage": "Invoice Approved",
+      "paidAt": "2026-04-24T09:25:00.000Z"
+    },
+    {
+      "linkId": "plink_demo_003",
+      "businessId": "demo-business-001",
+      "amount": "75.50",
+      "workflowStage": "Pilot Deposit",
+      "paidAt": "2026-04-23T14:08:00.000Z"
+    }
+  ]
+}

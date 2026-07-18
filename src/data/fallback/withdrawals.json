@@ -1,0 +1,22 @@
+{
+  "withdrawals": [
+    {
+      "id": "wd_demo_001",
+      "amount": "120.00",
+      "recipientAddress": "GDST2M6QY7E5R4Q4QY7E5R4Q4QY7E5R4Q4QY7E5R4Q4QY7E5R4QZ",
+      "status": "completed",
+      "payoutTxHash": "b66d3a0dd9f79d5f35cf13e5eb0ec53fd4c90af7d5a18ea64d9d4d51e4f2cf42",
+      "contractTxHash": "f7e6d5c4b3a2910099887766554433221100ffeeddccbbaa9988776655443322",
+      "createdAt": "2026-04-24T13:45:00.000Z"
+    },
+    {
+      "id": "wd_demo_002",
+      "amount": "45.50",
+      "recipientAddress": "GDST2M6QY7E5R4Q4QY7E5R4Q4QY7E5R4Q4QY7E5R4Q4QY7E5R4QZ",
+      "status": "pending",
+      "payoutTxHash": null,
+      "contractTxHash": "00aabbddeeff11223344556677889900aabbccddeeff00112233445566778899",
+      "createdAt": "2026-04-25T05:20:00.000Z"
+    }
+  ]
+}

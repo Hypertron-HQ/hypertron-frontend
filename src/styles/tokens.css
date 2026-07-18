@@ -1,0 +1,13 @@
+/**
+ * Design tokens — reusable colours and borders for Hypertron UI.
+ *
+ * Usage:
+ *   Tailwind:  border-ui-border, border-ui-border/80, bg-ui-border-muted
+ *   CSS:       rgb(var(--ui-border)), rgb(var(--ui-border) / 0.8)
+ */
+
+:root {
+  /* Soft grey border — action cards, sidebar, inputs, panels (#e2e8f0) */
+  --ui-border: 226 232 240;
+  --ui-border-muted: 238 242 246; /* #eef2f6 — lighter companion for gradients */
+}
