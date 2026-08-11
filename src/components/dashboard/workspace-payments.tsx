@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { MockWorkspace } from "@/lib/mock-workspaces";
+import type { Workspace } from "@/mockdata";
 
 type Currency = "XLM" | "USDC" | "EURC";
 type PaymentsSubTab = "collect" | "send" | "subscriptions" | "customers";
@@ -73,7 +73,7 @@ function TokenLogo({
 const fieldCls =
   "h-11 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
 
-export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
+export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
   const [subTab, setSubTab] = useState<PaymentsSubTab>("collect");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<Currency>("XLM");

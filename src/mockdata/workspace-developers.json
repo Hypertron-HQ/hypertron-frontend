@@ -1,0 +1,12 @@
+{
+  "byWorkspaceId": {
+    "design-test": {
+      "publishableKeyMasked": "pk_test_••••••••••••4f2a",
+      "webhooksEmptyMessage": "No endpoints configured yet. Mock data only."
+    }
+  },
+  "default": {
+    "publishableKeyMasked": "pk_test_••••••••••••0000",
+    "webhooksEmptyMessage": "No endpoints configured yet. Mock data only."
+  }
+}

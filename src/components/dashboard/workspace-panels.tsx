@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
-import type { MockWorkspace } from "@/lib/mock-workspaces";
+import {
+  getWorkspaceDevelopers,
+  getWorkspaceTreasury,
+  type Workspace,
+} from "@/mockdata";
 
-const overviewStats = [
-  { value: "$8,240", label: "Collected" },
-  { value: "24", label: "Payments" },
-  { value: "2", label: "Processing" },
-  { value: "1", label: "Needs attention" },
-] as const;
+function titleCase(label: string) {
+  if (!label) return label;
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
-export function WorkspaceOverview({ workspace }: { workspace: MockWorkspace }) {
+export function WorkspaceOverview({ workspace }: { workspace: Workspace }) {
   return (
     <PanelShell
       eyebrow="Workspace"
@@ -16,7 +18,7 @@ export function WorkspaceOverview({ workspace }: { workspace: MockWorkspace }) {
       subtitle={`Pulse for ${workspace.name} — collections, settlements, and alerts.`}
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {overviewStats.map((stat) => (
+        {workspace.pulse.map((stat) => (
           <div
             key={stat.label}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm"
@@ -24,7 +26,9 @@ export function WorkspaceOverview({ workspace }: { workspace: MockWorkspace }) {
             <p className="text-2xl font-semibold tracking-tight text-slate-950">
               {stat.value}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{stat.label}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {titleCase(stat.label)}
+            </p>
           </div>
         ))}
       </div>
@@ -34,11 +38,15 @@ export function WorkspaceOverview({ workspace }: { workspace: MockWorkspace }) {
           Latest activity
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <span className="font-medium text-emerald-600">+$1,280 received</span>
-          <span className="h-px w-8 bg-slate-200 sm:w-12" />
-          <span>settling</span>
-          <span className="h-px w-8 bg-slate-200 sm:w-12" />
-          <span>available soon</span>
+          <span className="font-medium text-emerald-600">
+            {workspace.latest.highlight}
+          </span>
+          {workspace.latest.steps.map((step) => (
+            <span key={step} className="contents">
+              <span className="h-px w-8 bg-slate-200 sm:w-12" />
+              <span>{step}</span>
+            </span>
+          ))}
         </div>
       </div>
     </PanelShell>
@@ -47,7 +55,13 @@ export function WorkspaceOverview({ workspace }: { workspace: MockWorkspace }) {
 
 export { WorkspacePayments } from "@/components/dashboard/workspace-payments";
 
-export function WorkspaceDevelopers() {
+export function WorkspaceDevelopers({
+  workspace,
+}: {
+  workspace: Workspace;
+}) {
+  const developers = getWorkspaceDevelopers(workspace.id);
+
   return (
     <PanelShell
       eyebrow="Integrations"
@@ -60,13 +74,13 @@ export function WorkspaceDevelopers() {
             Publishable key
           </p>
           <p className="mt-2 font-mono text-sm text-slate-800">
-            pk_test_••••••••••••4f2a
+            {developers.publishableKeyMasked}
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
           <p className="text-sm font-semibold text-slate-900">Webhooks</p>
           <p className="mt-1 text-sm text-slate-500">
-            No endpoints configured yet. Mock data only.
+            {developers.webhooksEmptyMessage}
           </p>
         </div>
       </div>
@@ -74,7 +88,9 @@ export function WorkspaceDevelopers() {
   );
 }
 
-export function WorkspaceTreasury() {
+export function WorkspaceTreasury({ workspace }: { workspace: Workspace }) {
+  const treasury = getWorkspaceTreasury(workspace.id);
+
   return (
     <PanelShell
       eyebrow="Balances"
@@ -82,24 +98,20 @@ export function WorkspaceTreasury() {
       subtitle="Vault balances and withdrawal readiness for this workspace."
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-            USDC
-          </p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-            $6,420.00
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Available</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-            XLM
-          </p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-            1,820.40
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Available</p>
-        </div>
+        {treasury.balances.map((balance) => (
+          <div
+            key={balance.asset}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
+          >
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+              {balance.asset}
+            </p>
+            <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+              {balance.amount}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{balance.status}</p>
+          </div>
+        ))}
       </div>
     </PanelShell>
   );
@@ -108,7 +120,7 @@ export function WorkspaceTreasury() {
 export function WorkspaceSettingsPanel({
   workspace,
 }: {
-  workspace: MockWorkspace;
+  workspace: Workspace;
 }) {
   return (
     <PanelShell

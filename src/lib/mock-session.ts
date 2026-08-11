@@ -5,11 +5,17 @@ export type MockSession = {
   signedInAt: string;
 };
 
-const MOCK_WALLET = "GMOCKHYPERTRONDEMOWALLETADDRESS000000000000000001";
-
-export function createMockSession(): MockSession {
+/**
+ * TODO(auth):
+ * - Replace this localStorage session with a real authenticated user from the backend
+ *   (e.g. GET /api/auth/me or /user) after Freighter challenge + message signing lands.
+ * - Dashboard identity (sidebar wallet) should read from that server response, not
+ *   localStorage — localStorage stays only as a Freighter reconnect / UX cache.
+ * - Until then, createMockSession / getMockSession are a temporary client-only stand-in.
+ */
+export function createMockSession(walletAddress: string): MockSession {
   const session: MockSession = {
-    walletAddress: MOCK_WALLET,
+    walletAddress,
     signedInAt: new Date().toISOString(),
   };
 

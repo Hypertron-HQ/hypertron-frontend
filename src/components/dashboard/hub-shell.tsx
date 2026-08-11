@@ -27,6 +27,7 @@ import {
   shortenAddress,
   type MockSession,
 } from "@/lib/mock-session";
+import { getProfile } from "@/mockdata";
 
 const TAB_ICONS = {
   workspaces: LayoutGrid,
@@ -91,6 +92,7 @@ export function HubShell({ session }: { session: MockSession }) {
 
   const meta = TAB_META[tab];
   const walletShort = shortenAddress(session.walletAddress);
+  const profile = getProfile();
   const navItems = HUB_TABS.map((item) => ({
     ...item,
     icon: TAB_ICONS[item.id],
@@ -103,6 +105,10 @@ export function HubShell({ session }: { session: MockSession }) {
       onSelect={selectTab}
       breadcrumb={meta.breadcrumb}
       searchPlaceholder={meta.searchPlaceholder}
+      identity={{
+        title: profile.displayName,
+        subtitle: session.walletAddress,
+      }}
     >
       {!ready ? null : (
         <>

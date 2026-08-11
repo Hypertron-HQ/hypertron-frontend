@@ -1,0 +1,77 @@
+{
+  "featuredId": "design-test",
+  "items": [
+    {
+      "id": "design-test",
+      "name": "DesignTest Co.",
+      "initial": "D",
+      "members": 6,
+      "tier": "Tier 1",
+      "role": "Owner",
+      "lastAccessed": "1 day ago",
+      "pulse": [
+        { "value": "$8,240", "label": "collected", "warn": false },
+        { "value": "24", "label": "payments", "warn": false },
+        { "value": "2", "label": "processing", "warn": false },
+        { "value": "1", "label": "needs attention", "warn": true }
+      ],
+      "latest": {
+        "highlight": "+$1,280 received",
+        "steps": ["settling", "available soon"]
+      },
+      "directory": {
+        "openTasks": "1",
+        "pendingApprovals": "—",
+        "complianceAlerts": "All Clear"
+      }
+    },
+    {
+      "id": "main-1",
+      "name": "Main Workspace",
+      "initial": "M",
+      "members": 8,
+      "tier": "Tier 1",
+      "role": "Owner",
+      "lastAccessed": "1 day ago",
+      "pulse": [
+        { "value": "$3,100", "label": "collected", "warn": false },
+        { "value": "11", "label": "payments", "warn": false },
+        { "value": "0", "label": "processing", "warn": false },
+        { "value": "0", "label": "needs attention", "warn": false }
+      ],
+      "latest": {
+        "highlight": "+$420 received",
+        "steps": ["settling", "available soon"]
+      },
+      "directory": {
+        "openTasks": "1",
+        "pendingApprovals": "—",
+        "complianceAlerts": "All Clear"
+      }
+    },
+    {
+      "id": "main-2",
+      "name": "Main Workspace",
+      "initial": "M",
+      "members": 8,
+      "tier": "Tier 1",
+      "role": "Owner",
+      "lastAccessed": "1 day ago",
+      "pulse": [
+        { "value": "$1,050", "label": "collected", "warn": false },
+        { "value": "4", "label": "payments", "warn": false },
+        { "value": "1", "label": "processing", "warn": false },
+        { "value": "0", "label": "needs attention", "warn": false }
+      ],
+      "latest": {
+        "highlight": "+$90 received",
+        "steps": ["settling", "available soon"]
+      },
+      "directory": {
+        "openTasks": "1",
+        "pendingApprovals": "—",
+        "complianceAlerts": "All Clear"
+      }
+    }
+  ]
+}

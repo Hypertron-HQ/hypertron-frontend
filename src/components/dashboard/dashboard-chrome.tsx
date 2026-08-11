@@ -19,12 +19,20 @@ export type DashboardNavItem = {
   icon: LucideIcon;
 };
 
+export type DashboardIdentity = {
+  /** Primary label (display name when available) */
+  title: string;
+  /** Wallet address under the name — not a role label */
+  subtitle?: string;
+};
+
 export function DashboardChrome({
   navItems,
   activeId,
   onSelect,
   breadcrumb,
   searchPlaceholder,
+  identity,
   children,
 }: {
   navItems: DashboardNavItem[];
@@ -32,8 +40,10 @@ export function DashboardChrome({
   onSelect: (id: string) => void;
   breadcrumb: string;
   searchPlaceholder: string;
+  identity?: DashboardIdentity;
   children: ReactNode;
 }) {
+  const identityTitle = identity?.title ?? "Not signed in";
   return (
     <div className="relative min-h-svh overflow-hidden text-white">
       <Image
@@ -50,7 +60,7 @@ export function DashboardChrome({
       />
 
       <div className="relative z-10 flex min-h-svh gap-3 p-3 md:gap-4 md:p-4">
-        <aside className="flex w-[220px] shrink-0 flex-col py-2 pl-1">
+        <aside className="flex w-[220px] shrink-0 flex-col py-2 pb-10 pl-1">
           <Link href="/dashboard" className="flex items-center gap-2.5 px-3 pt-2">
             <HypertronLogoMark size={32} />
             <span className="font-display text-[15px] font-semibold tracking-tight">
@@ -98,7 +108,7 @@ export function DashboardChrome({
             })}
           </nav>
 
-          <div className="space-y-3 px-2 pb-2">
+          <div className="space-y-3 px-2">
             <button
               type="button"
               className="flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium text-white transition hover:bg-white/[0.05]"
@@ -116,9 +126,16 @@ export function DashboardChrome({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">
-                  Soumik Baksi
+                  {identityTitle}
                 </p>
-                <p className="truncate text-xs text-slate-400">Admin</p>
+                {identity?.subtitle ? (
+                  <p
+                    className="truncate font-mono text-xs text-slate-400"
+                    title={identity.subtitle}
+                  >
+                    {identity.subtitle}
+                  </p>
+                ) : null}
               </div>
               <ChevronsUpDown
                 className="size-4 shrink-0 text-[#60A5FA]"

@@ -4,13 +4,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { RequireMockSession } from "@/components/dashboard/require-mock-session";
 import { WorkspaceShell } from "@/components/dashboard/workspace-shell";
-import { getMockWorkspace } from "@/lib/mock-workspaces";
+import { getWorkspace } from "@/mockdata";
 
 export default function WorkspaceDashboardPage() {
   const params = useParams<{ workspaceId: string }>();
   const router = useRouter();
   const workspaceId = params.workspaceId;
-  const workspace = workspaceId ? getMockWorkspace(workspaceId) : undefined;
+  const workspace = workspaceId ? getWorkspace(workspaceId) : undefined;
 
   useEffect(() => {
     if (workspaceId && !workspace) {

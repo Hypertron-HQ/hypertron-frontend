@@ -1,30 +1,9 @@
 import type { ReactNode } from "react";
-
-const MOCK_AUDIT_EVENTS = [
-  {
-    id: "evt_01",
-    action: "Workspace created",
-    actor: "Soumik Baksi",
-    detail: "Acme Settlements",
-    at: "2 hours ago",
-  },
-  {
-    id: "evt_02",
-    action: "Wallet connected",
-    actor: "Soumik Baksi",
-    detail: "Freighter · mock session",
-    at: "Yesterday",
-  },
-  {
-    id: "evt_03",
-    action: "Plan viewed",
-    actor: "Soumik Baksi",
-    detail: "Public beta",
-    at: "3 days ago",
-  },
-] as const;
+import { getAuditEvents, getBillingPlan } from "@/mockdata";
 
 export function HubAudit() {
+  const events = getAuditEvents();
+
   return (
     <PanelShell
       eyebrow="Security"
@@ -32,7 +11,7 @@ export function HubAudit() {
       subtitle="Immutable event history for workspace activity and account changes."
     >
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {MOCK_AUDIT_EVENTS.map((event) => (
+        {events.map((event) => (
           <li
             key={event.id}
             className="flex items-start justify-between gap-4 px-5 py-4"
@@ -54,6 +33,8 @@ export function HubAudit() {
 }
 
 export function HubBilling() {
+  const billing = getBillingPlan();
+
   return (
     <PanelShell
       eyebrow="Account"
@@ -61,10 +42,8 @@ export function HubBilling() {
       subtitle="Manage your plan, invoices, and usage."
     >
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-        <p className="text-sm font-semibold text-slate-900">Public beta</p>
-        <p className="mt-1 text-sm text-slate-500">
-          You&apos;re on the demo plan. Billing integration comes later.
-        </p>
+        <p className="text-sm font-semibold text-slate-900">{billing.planName}</p>
+        <p className="mt-1 text-sm text-slate-500">{billing.planDescription}</p>
       </div>
     </PanelShell>
   );
@@ -81,14 +60,13 @@ export function HubSettingsPanel({
     <PanelShell
       eyebrow="Account"
       title="Settings"
-      subtitle="Profile and session preferences for this mock workspace hub."
+      subtitle="Profile and session preferences for this workspace hub."
     >
       <div className="max-w-lg rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
         <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
           Connected wallet
         </p>
         <p className="mt-2 font-mono text-sm text-slate-800">{walletShort}</p>
-        <p className="mt-1 text-xs text-slate-500">Freighter · mock session</p>
         <button
           type="button"
           onClick={onSignOut}

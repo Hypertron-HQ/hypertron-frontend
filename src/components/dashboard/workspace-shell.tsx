@@ -27,7 +27,8 @@ import {
   isWorkspaceTab,
   type WorkspaceTab,
 } from "@/components/dashboard/workspace-types";
-import type { MockWorkspace } from "@/lib/mock-workspaces";
+import { getMockSession } from "@/lib/mock-session";
+import { getProfile, type Workspace } from "@/mockdata";
 
 const TAB_ICONS = {
   overview: LayoutDashboard,
@@ -69,12 +70,16 @@ function readTabFromUrl(): WorkspaceTab {
   return isWorkspaceTab(value) ? value : "overview";
 }
 
-export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
+export function WorkspaceShell({ workspace }: { workspace: Workspace }) {
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [ready, setReady] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const profile = getProfile();
 
   useEffect(() => {
     setTab(readTabFromUrl());
+    const session = getMockSession();
+    setWalletAddress(session?.walletAddress ?? null);
     setReady(true);
   }, []);
 
@@ -102,6 +107,14 @@ export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
       onSelect={selectTab}
       breadcrumb={`${workspace.name} / ${meta.label}`}
       searchPlaceholder={meta.searchPlaceholder}
+      identity={
+        walletAddress
+          ? {
+              title: profile.displayName,
+              subtitle: walletAddress,
+            }
+          : undefined
+      }
     >
       {!ready ? null : (
         <>
@@ -112,10 +125,10 @@ export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
             <WorkspacePayments workspace={workspace} />
           </TabPanel>
           <TabPanel active={tab === "developers"}>
-            <WorkspaceDevelopers />
+            <WorkspaceDevelopers workspace={workspace} />
           </TabPanel>
           <TabPanel active={tab === "treasury"}>
-            <WorkspaceTreasury />
+            <WorkspaceTreasury workspace={workspace} />
           </TabPanel>
           <TabPanel active={tab === "settings"}>
             <WorkspaceSettingsPanel workspace={workspace} />
