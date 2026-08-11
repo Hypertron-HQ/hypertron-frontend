@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createPaymentLink } from "@/lib/payment-links";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/mockdata";
 
@@ -86,9 +87,12 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
   const [workflowStage, setWorkflowStage] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [result, setResult] = useState<{ linkId: string; url: string } | null>(
-    null,
-  );
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    linkId: string;
+    url: string;
+    memo: string;
+  } | null>(null);
 
   const vaultName = `${workspace.name} Vault`;
 
@@ -101,20 +105,37 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
     return parts.join(" · ");
   }, [amount, currency, description]);
 
-  function handleGenerate(e: React.FormEvent) {
+  async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     const normalized = amount.replace(/,/g, "").trim();
     if (!normalized) return;
 
     setLoading(true);
-    window.setTimeout(() => {
-      const linkId = `pay_${Math.random().toString(36).slice(2, 10)}`;
-      setResult({
-        linkId,
-        url: `https://pay.hypertron.io/l/${linkId}`,
-      });
-      setLoading(false);
-    }, 450);
+    setError(null);
+
+    const created = await createPaymentLink({
+      businessId: workspace.id,
+      amount: normalized,
+      currency,
+      purpose: description.trim() || undefined,
+      clientName: customer.trim() || undefined,
+      metadata: metadata.trim() || undefined,
+      expiryDays: expiry,
+      workflowStage: workflowStage.trim() || undefined,
+    });
+
+    setLoading(false);
+
+    if (!created.ok) {
+      setError(created.error);
+      return;
+    }
+
+    setResult({
+      linkId: created.link.linkId,
+      url: created.link.url,
+      memo: created.link.memo,
+    });
   }
 
   async function copyLink() {
@@ -196,6 +217,12 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
             </Button>
           </div>
 
+          {error ? (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
           {result ? (
             <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -205,6 +232,11 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
                 <p className="mt-0.5 truncate font-mono text-xs text-emerald-700">
                   {result.url}
                 </p>
+                {result.memo ? (
+                  <p className="mt-1 font-mono text-[11px] text-emerald-700/80">
+                    memo {result.memo}
+                  </p>
+                ) : null}
               </div>
               <Button
                 type="button"

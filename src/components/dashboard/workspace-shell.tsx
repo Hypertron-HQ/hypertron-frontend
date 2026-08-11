@@ -27,8 +27,9 @@ import {
   isWorkspaceTab,
   type WorkspaceTab,
 } from "@/components/dashboard/workspace-types";
-import { getMockSession } from "@/lib/mock-session";
-import { getProfile, type Workspace } from "@/mockdata";
+import type { BusinessProfile } from "@/lib/business";
+import type { WalletSession } from "@/lib/auth";
+import type { Workspace } from "@/mockdata";
 
 const TAB_ICONS = {
   overview: LayoutDashboard,
@@ -70,16 +71,20 @@ function readTabFromUrl(): WorkspaceTab {
   return isWorkspaceTab(value) ? value : "overview";
 }
 
-export function WorkspaceShell({ workspace }: { workspace: Workspace }) {
+export function WorkspaceShell({
+  workspace,
+  session,
+  profile,
+}: {
+  workspace: Workspace;
+  session: WalletSession;
+  profile: BusinessProfile;
+}) {
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [ready, setReady] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const profile = getProfile();
 
   useEffect(() => {
     setTab(readTabFromUrl());
-    const session = getMockSession();
-    setWalletAddress(session?.walletAddress ?? null);
     setReady(true);
   }, []);
 
@@ -107,14 +112,10 @@ export function WorkspaceShell({ workspace }: { workspace: Workspace }) {
       onSelect={selectTab}
       breadcrumb={`${workspace.name} / ${meta.label}`}
       searchPlaceholder={meta.searchPlaceholder}
-      identity={
-        walletAddress
-          ? {
-              title: profile.displayName,
-              subtitle: walletAddress,
-            }
-          : undefined
-      }
+      identity={{
+        title: profile.name.trim() || workspace.name,
+        subtitle: session.walletAddress,
+      }}
     >
       {!ready ? null : (
         <>
@@ -125,7 +126,7 @@ export function WorkspaceShell({ workspace }: { workspace: Workspace }) {
             <WorkspacePayments workspace={workspace} />
           </TabPanel>
           <TabPanel active={tab === "developers"}>
-            <WorkspaceDevelopers workspace={workspace} />
+            <WorkspaceDevelopers />
           </TabPanel>
           <TabPanel active={tab === "treasury"}>
             <WorkspaceTreasury workspace={workspace} />

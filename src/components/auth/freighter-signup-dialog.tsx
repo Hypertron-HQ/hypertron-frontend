@@ -12,10 +12,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  connectFreighter,
   FREIGHTER_INSTALL_URL,
+  runWalletSignInFlow,
 } from "@/lib/freighter-connect";
-import { createMockSession } from "@/lib/mock-session";
 
 type Step = "choose" | "connecting";
 
@@ -39,9 +38,9 @@ export function FreighterSignupDialog() {
   async function handleFreighterSignIn() {
     setStep("connecting");
     setError(null);
-    setStatus("Connecting to Freighter…");
+    setStatus("Connecting…");
 
-    const result = await connectFreighter(setStatus);
+    const result = await runWalletSignInFlow(setStatus);
     if (!result.ok) {
       if (result.needsInstall) {
         window.open(FREIGHTER_INSTALL_URL, "_blank", "noopener,noreferrer");
@@ -52,7 +51,6 @@ export function FreighterSignupDialog() {
       return;
     }
 
-    createMockSession(result.walletAddress);
     setOpen(false);
     setStep("choose");
     setStatus(null);
@@ -76,8 +74,8 @@ export function FreighterSignupDialog() {
             Sign up with Freighter
           </DialogTitle>
           <DialogDescription className="text-mist">
-            Connect your Stellar wallet to open the dashboard. Message signing
-            auth will be added with the backend.
+            Connect your Stellar wallet and sign a one-time challenge to open
+            the dashboard.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,10 +111,11 @@ export function FreighterSignupDialog() {
           ) : (
             <div className="rounded-xl border border-line bg-glass px-4 py-5">
               <p className="text-sm font-medium text-fog">
-                {status ?? "Connecting Freighter…"}
+                {status ?? "Connecting…"}
               </p>
               <p className="mt-2 text-sm leading-relaxed text-mist">
-                Approve the connection request in the Freighter extension.
+                Approve each Freighter prompt, then we verify your signature
+                with Hypertron.
               </p>
               <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-yellow via-blue to-cyan" />

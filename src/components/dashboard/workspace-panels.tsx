@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
-import {
-  getWorkspaceDevelopers,
-  getWorkspaceTreasury,
-  type Workspace,
-} from "@/mockdata";
+import { getWorkspaceTreasury, type Workspace } from "@/mockdata";
+
+export { WorkspaceDevelopers } from "@/components/dashboard/workspace-developers";
 
 function titleCase(label: string) {
   if (!label) return label;
@@ -54,39 +52,6 @@ export function WorkspaceOverview({ workspace }: { workspace: Workspace }) {
 }
 
 export { WorkspacePayments } from "@/components/dashboard/workspace-payments";
-
-export function WorkspaceDevelopers({
-  workspace,
-}: {
-  workspace: Workspace;
-}) {
-  const developers = getWorkspaceDevelopers(workspace.id);
-
-  return (
-    <PanelShell
-      eyebrow="Integrations"
-      title="Developer Access"
-      subtitle="API keys, webhooks, and integration credentials for this workspace."
-    >
-      <div className="space-y-3">
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-            Publishable key
-          </p>
-          <p className="mt-2 font-mono text-sm text-slate-800">
-            {developers.publishableKeyMasked}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-          <p className="text-sm font-semibold text-slate-900">Webhooks</p>
-          <p className="mt-1 text-sm text-slate-500">
-            {developers.webhooksEmptyMessage}
-          </p>
-        </div>
-      </div>
-    </PanelShell>
-  );
-}
 
 export function WorkspaceTreasury({ workspace }: { workspace: Workspace }) {
   const treasury = getWorkspaceTreasury(workspace.id);
