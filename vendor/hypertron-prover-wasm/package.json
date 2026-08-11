@@ -1,0 +1,17 @@
+{
+  "name": "hypertron-prover-wasm",
+  "type": "module",
+  "description": "WebAssembly bindings for the Hypertron off-chain prover (browser + Node)",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "hypertron_prover_bg.wasm",
+    "hypertron_prover.js",
+    "hypertron_prover.d.ts"
+  ],
+  "main": "hypertron_prover.js",
+  "types": "hypertron_prover.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

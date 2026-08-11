@@ -22,11 +22,12 @@ import {
 } from "@/components/dashboard/hub-panels";
 import { HUB_TABS, isHubTab, type HubTab } from "@/components/dashboard/hub-types";
 import { HubWorkspaces } from "@/components/dashboard/hub-workspaces";
+import type { BusinessProfile } from "@/lib/business";
 import {
-  clearMockSession,
+  logoutAuth,
   shortenAddress,
-  type MockSession,
-} from "@/lib/mock-session";
+  type WalletSession,
+} from "@/lib/auth";
 
 const TAB_ICONS = {
   workspaces: LayoutGrid,
@@ -63,15 +64,27 @@ function readTabFromUrl(): HubTab {
   return isHubTab(value) ? value : "workspaces";
 }
 
-export function HubShell({ session }: { session: MockSession }) {
+export function HubShell({
+  session,
+  profile,
+}: {
+  session: WalletSession;
+  profile: BusinessProfile;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<HubTab>("workspaces");
   const [ready, setReady] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState(profile);
 
   useEffect(() => {
     setTab(readTabFromUrl());
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    setCurrentProfile(profile);
+  }, [profile]);
 
   const selectTab = useCallback((next: string) => {
     if (!isHubTab(next)) return;
@@ -84,8 +97,10 @@ export function HubShell({ session }: { session: MockSession }) {
     });
   }, []);
 
-  function signOut() {
-    clearMockSession();
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    await logoutAuth();
     router.replace("/");
   }
 
@@ -103,11 +118,18 @@ export function HubShell({ session }: { session: MockSession }) {
       onSelect={selectTab}
       breadcrumb={meta.breadcrumb}
       searchPlaceholder={meta.searchPlaceholder}
+      identity={{
+        title: currentProfile.name.trim() || "Workspace",
+        subtitle: session.walletAddress,
+      }}
     >
       {!ready ? null : (
         <>
           <TabPanel active={tab === "workspaces"}>
-            <HubWorkspaces />
+            <HubWorkspaces
+              profile={currentProfile}
+              walletAddress={session.walletAddress}
+            />
           </TabPanel>
           <TabPanel active={tab === "audit"}>
             <HubAudit />
@@ -117,8 +139,10 @@ export function HubShell({ session }: { session: MockSession }) {
           </TabPanel>
           <TabPanel active={tab === "settings"}>
             <HubSettingsPanel
+              profile={currentProfile}
               walletShort={walletShort}
               onSignOut={signOut}
+              onProfileUpdated={setCurrentProfile}
             />
           </TabPanel>
         </>

@@ -27,7 +27,9 @@ import {
   isWorkspaceTab,
   type WorkspaceTab,
 } from "@/components/dashboard/workspace-types";
-import type { MockWorkspace } from "@/lib/mock-workspaces";
+import type { BusinessProfile } from "@/lib/business";
+import type { WalletSession } from "@/lib/auth";
+import type { Workspace } from "@/mockdata";
 
 const TAB_ICONS = {
   overview: LayoutDashboard,
@@ -69,7 +71,15 @@ function readTabFromUrl(): WorkspaceTab {
   return isWorkspaceTab(value) ? value : "overview";
 }
 
-export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
+export function WorkspaceShell({
+  workspace,
+  session,
+  profile,
+}: {
+  workspace: Workspace;
+  session: WalletSession;
+  profile: BusinessProfile;
+}) {
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [ready, setReady] = useState(false);
 
@@ -102,6 +112,10 @@ export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
       onSelect={selectTab}
       breadcrumb={`${workspace.name} / ${meta.label}`}
       searchPlaceholder={meta.searchPlaceholder}
+      identity={{
+        title: profile.name.trim() || workspace.name,
+        subtitle: session.walletAddress,
+      }}
     >
       {!ready ? null : (
         <>
@@ -115,7 +129,7 @@ export function WorkspaceShell({ workspace }: { workspace: MockWorkspace }) {
             <WorkspaceDevelopers />
           </TabPanel>
           <TabPanel active={tab === "treasury"}>
-            <WorkspaceTreasury />
+            <WorkspaceTreasury workspace={workspace} />
           </TabPanel>
           <TabPanel active={tab === "settings"}>
             <WorkspaceSettingsPanel workspace={workspace} />

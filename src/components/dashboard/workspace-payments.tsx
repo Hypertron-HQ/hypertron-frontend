@@ -15,8 +15,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaymentLinksTable } from "@/components/dashboard/payment-links-table";
+import { createPaymentLink } from "@/lib/payment-links";
 import { cn } from "@/lib/utils";
-import type { MockWorkspace } from "@/lib/mock-workspaces";
+import type { Workspace } from "@/mockdata";
 
 type Currency = "XLM" | "USDC" | "EURC";
 type PaymentsSubTab = "collect" | "send" | "subscriptions" | "customers";
@@ -73,7 +75,7 @@ function TokenLogo({
 const fieldCls =
   "h-11 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
 
-export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
+export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
   const [subTab, setSubTab] = useState<PaymentsSubTab>("collect");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<Currency>("XLM");
@@ -86,9 +88,13 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
   const [workflowStage, setWorkflowStage] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [result, setResult] = useState<{ linkId: string; url: string } | null>(
-    null,
-  );
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    linkId: string;
+    url: string;
+    memo: string;
+  } | null>(null);
+  const [linksRefreshKey, setLinksRefreshKey] = useState(0);
 
   const vaultName = `${workspace.name} Vault`;
 
@@ -101,20 +107,53 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
     return parts.join(" · ");
   }, [amount, currency, description]);
 
-  function handleGenerate(e: React.FormEvent) {
+  function setPrivateSettlementOn(next: boolean) {
+    setPrivateSettlement(next);
+    if (next && currency !== "XLM") {
+      setCurrency("XLM");
+    }
+  }
+
+  async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     const normalized = amount.replace(/,/g, "").trim();
     if (!normalized) return;
 
+    if (privateSettlement && currency !== "XLM") {
+      setError(
+        "Private Settlement uses the XLM testnet pool. Switch currency to XLM.",
+      );
+      return;
+    }
+
     setLoading(true);
-    window.setTimeout(() => {
-      const linkId = `pay_${Math.random().toString(36).slice(2, 10)}`;
-      setResult({
-        linkId,
-        url: `https://pay.hypertron.io/l/${linkId}`,
-      });
-      setLoading(false);
-    }, 450);
+    setError(null);
+
+    const created = await createPaymentLink({
+      businessId: workspace.id,
+      amount: normalized,
+      currency,
+      purpose: description.trim() || undefined,
+      clientName: customer.trim() || undefined,
+      note: metadata.trim() || undefined,
+      privateSettlement,
+      expiryDays: expiry,
+      workflowStage: workflowStage.trim() || undefined,
+    });
+
+    setLoading(false);
+
+    if (!created.ok) {
+      setError(created.error);
+      return;
+    }
+
+    setResult({
+      linkId: created.link.linkId,
+      url: created.link.url,
+      memo: created.link.memo,
+    });
+    setLinksRefreshKey((key) => key + 1);
   }
 
   async function copyLink() {
@@ -174,6 +213,7 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
           Send payments UI coming next — use Collect to create a payment link.
         </div>
       ) : (
+        <>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -196,6 +236,12 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
             </Button>
           </div>
 
+          {error ? (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
           {result ? (
             <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -205,6 +251,11 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                 <p className="mt-0.5 truncate font-mono text-xs text-emerald-700">
                   {result.url}
                 </p>
+                {result.memo ? (
+                  <p className="mt-1 font-mono text-[11px] text-emerald-700/80">
+                    memo {result.memo}
+                  </p>
+                ) : null}
               </div>
               <Button
                 type="button"
@@ -252,7 +303,13 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                         aria-label="Currency"
                       >
                         {CURRENCY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
+                          <option
+                            key={opt.value}
+                            value={opt.value}
+                            disabled={
+                              privateSettlement && opt.value !== "XLM"
+                            }
+                          >
                             {opt.value}
                           </option>
                         ))}
@@ -390,8 +447,9 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Default checkout preview with hash-memo privacy +
-                        PoolManager commitments. Payers opt in at checkout.
+                        {privateSettlement
+                          ? "Shield into Hypertron pool (XLM testnet) via ZK deposit."
+                          : "Public Stellar payment straight to your Freighter wallet (G…) with memo attribution."}
                       </p>
                     </div>
                     <button
@@ -399,7 +457,7 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                       role="switch"
                       aria-checked={privateSettlement}
                       aria-label="Enable private settlement"
-                      onClick={() => setPrivateSettlement((v) => !v)}
+                      onClick={() => setPrivateSettlementOn(!privateSettlement)}
                       className={cn(
                         "relative h-6 w-11 shrink-0 rounded-full transition-colors",
                         privateSettlement ? "bg-amber-600" : "bg-slate-300",
@@ -416,16 +474,18 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                   <div className="flex gap-3 rounded-lg bg-white/80 px-3 py-2.5">
                     <Shield className="mt-0.5 size-4 shrink-0 text-slate-400" />
                     <p className="text-xs leading-relaxed text-slate-500">
-                      Test commitments in Secure Vault. Not audited — testnet
-                      only.
+                      {privateSettlement
+                        ? "XLM only on the live testnet pool. Not audited — testnet only."
+                        : "Payer sends a classic Freighter payment. Privacy pool stays off."}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-xs text-slate-500">
-                    Settles to global pool · attributed to your workspace via
-                    memo
+                    {privateSettlement
+                      ? "Checkout will invoke pool deposit on the Hypertron transfer contract."
+                      : "Settles to your wallet · attributed via memo (not the privacy pool)"}
                   </p>
                   <div className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
@@ -435,15 +495,10 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
                       <p className="text-sm font-semibold text-slate-900">
                         {vaultName}
                       </p>
-                      <p className="text-xs text-slate-500">Available Balance</p>
-                    </div>
-                    <div className="relative flex shrink-0 flex-col items-end gap-0.5">
-                      <span className="absolute -top-1 right-0 size-1.5 rounded-full bg-red-500" />
-                      <p className="text-sm font-semibold tabular-nums text-slate-900">
-                        15,890.44 received
-                      </p>
-                      <p className="text-[10px] text-slate-400">
-                        all-time (settled links)
+                      <p className="text-xs text-slate-500">
+                        {privateSettlement
+                          ? "Shielded pool (testnet)"
+                          : "Transparent settlement"}
                       </p>
                     </div>
                   </div>
@@ -495,6 +550,12 @@ export function WorkspacePayments({ workspace }: { workspace: MockWorkspace }) {
             </div>
           </form>
         </div>
+
+        <PaymentLinksTable
+          businessId={workspace.id}
+          refreshKey={linksRefreshKey}
+        />
+        </>
       )}
     </div>
   );

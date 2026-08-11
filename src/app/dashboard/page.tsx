@@ -1,12 +1,14 @@
 "use client";
 
 import { HubShell } from "@/components/dashboard/hub-shell";
-import { RequireMockSession } from "@/components/dashboard/require-mock-session";
+import { RequireWalletSession } from "@/components/dashboard/require-wallet-session";
 
 export default function DashboardPage() {
   return (
-    <RequireMockSession>
-      {(session) => <HubShell session={session} />}
-    </RequireMockSession>
+    <RequireWalletSession>
+      {(session, profile) => (
+        <HubShell session={session} profile={profile} />
+      )}
+    </RequireWalletSession>
   );
 }

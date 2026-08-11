@@ -1,30 +1,15 @@
-import type { ReactNode } from "react";
+"use client";
 
-const MOCK_AUDIT_EVENTS = [
-  {
-    id: "evt_01",
-    action: "Workspace created",
-    actor: "Soumik Baksi",
-    detail: "Acme Settlements",
-    at: "2 hours ago",
-  },
-  {
-    id: "evt_02",
-    action: "Wallet connected",
-    actor: "Soumik Baksi",
-    detail: "Freighter · mock session",
-    at: "Yesterday",
-  },
-  {
-    id: "evt_03",
-    action: "Plan viewed",
-    actor: "Soumik Baksi",
-    detail: "Public beta",
-    at: "3 days ago",
-  },
-] as const;
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  updateBusinessProfile,
+  type BusinessProfile,
+} from "@/lib/business";
+import { getAuditEvents, getBillingPlan } from "@/mockdata";
 
 export function HubAudit() {
+  const events = getAuditEvents();
+
   return (
     <PanelShell
       eyebrow="Security"
@@ -32,7 +17,7 @@ export function HubAudit() {
       subtitle="Immutable event history for workspace activity and account changes."
     >
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {MOCK_AUDIT_EVENTS.map((event) => (
+        {events.map((event) => (
           <li
             key={event.id}
             className="flex items-start justify-between gap-4 px-5 py-4"
@@ -54,6 +39,8 @@ export function HubAudit() {
 }
 
 export function HubBilling() {
+  const billing = getBillingPlan();
+
   return (
     <PanelShell
       eyebrow="Account"
@@ -61,41 +48,150 @@ export function HubBilling() {
       subtitle="Manage your plan, invoices, and usage."
     >
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-        <p className="text-sm font-semibold text-slate-900">Public beta</p>
-        <p className="mt-1 text-sm text-slate-500">
-          You&apos;re on the demo plan. Billing integration comes later.
-        </p>
+        <p className="text-sm font-semibold text-slate-900">{billing.planName}</p>
+        <p className="mt-1 text-sm text-slate-500">{billing.planDescription}</p>
       </div>
     </PanelShell>
   );
 }
 
+const fieldCls =
+  "mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+
 export function HubSettingsPanel({
+  profile,
   walletShort,
   onSignOut,
+  onProfileUpdated,
 }: {
+  profile: BusinessProfile;
   walletShort: string;
   onSignOut: () => void;
+  onProfileUpdated: (profile: BusinessProfile) => void;
 }) {
+  const [name, setName] = useState(profile.name);
+  const [email, setEmail] = useState(profile.email ?? "");
+  const [businessNature, setBusinessNature] = useState(
+    profile.businessNature ?? "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setName(profile.name);
+    setEmail(profile.email ?? "");
+    setBusinessNature(profile.businessNature ?? "");
+  }, [profile]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Business name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+
+    const result = await updateBusinessProfile({
+      name: trimmed,
+      email: email.trim() || undefined,
+      businessNature: businessNature.trim() || undefined,
+    });
+
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    onProfileUpdated(result.profile);
+    setName(result.profile.name);
+    setEmail(result.profile.email ?? "");
+    setBusinessNature(result.profile.businessNature ?? "");
+    setSaved(true);
+  }
+
   return (
     <PanelShell
       eyebrow="Account"
       title="Settings"
-      subtitle="Profile and session preferences for this mock workspace hub."
+      subtitle="Profile and session preferences for this workspace hub."
     >
-      <div className="max-w-lg rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-          Connected wallet
-        </p>
-        <p className="mt-2 font-mono text-sm text-slate-800">{walletShort}</p>
-        <p className="mt-1 text-xs text-slate-500">Freighter · mock session</p>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="mt-5 inline-flex h-10 items-center rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      <div className="max-w-lg space-y-4">
+        <form
+          onSubmit={handleSave}
+          className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
         >
-          Sign out
-        </button>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            Business profile
+          </p>
+
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            Business name
+            <input
+              className={fieldCls}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </label>
+
+          <label className="mt-3 block text-sm font-medium text-slate-700">
+            Business type
+            <input
+              className={fieldCls}
+              value={businessNature}
+              onChange={(e) => setBusinessNature(e.target.value)}
+              placeholder="Agency, SaaS, marketplace…"
+            />
+          </label>
+
+          <label className="mt-3 block text-sm font-medium text-slate-700">
+            Email
+            <input
+              type="email"
+              className={fieldCls}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+            />
+          </label>
+
+          {error ? (
+            <p className="mt-3 text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {saved ? (
+            <p className="mt-3 text-sm text-emerald-600">Profile saved.</p>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </form>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            Connected wallet
+          </p>
+          <p className="mt-2 font-mono text-sm text-slate-800">{walletShort}</p>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="mt-5 inline-flex h-10 items-center rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </PanelShell>
   );

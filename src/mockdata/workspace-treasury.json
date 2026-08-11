@@ -1,0 +1,16 @@
+{
+  "byWorkspaceId": {
+    "design-test": {
+      "balances": [
+        { "asset": "USDC", "amount": "$6,420.00", "status": "Available" },
+        { "asset": "XLM", "amount": "1,820.40", "status": "Available" }
+      ]
+    }
+  },
+  "default": {
+    "balances": [
+      { "asset": "USDC", "amount": "$0.00", "status": "Available" },
+      { "asset": "XLM", "amount": "0.00", "status": "Available" }
+    ]
+  }
+}

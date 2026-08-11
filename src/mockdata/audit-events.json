@@ -1,0 +1,23 @@
+[
+  {
+    "id": "evt_01",
+    "action": "Workspace created",
+    "actor": "Soumik Baksi",
+    "detail": "Acme Settlements",
+    "at": "2 hours ago"
+  },
+  {
+    "id": "evt_02",
+    "action": "Wallet connected",
+    "actor": "Soumik Baksi",
+    "detail": "Freighter · connected",
+    "at": "Yesterday"
+  },
+  {
+    "id": "evt_03",
+    "action": "Plan viewed",
+    "actor": "Soumik Baksi",
+    "detail": "Public beta",
+    "at": "3 days ago"
+  }
+]
