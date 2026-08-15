@@ -1,18 +1,18 @@
 /* @ts-self-types="./hypertron_prover.d.ts" */
 
 /**
- * Note commitment `cm = Poseidon(Poseidon(n, k), v)` as `0x`-hex.
- * @param {string} n
+ * Note commitment `cm = Poseidon(Poseidon(owner_pk, k), v)` as `0x`-hex.
+ * @param {string} owner_pk
  * @param {string} k
  * @param {string} v
  * @returns {string}
  */
-export function commitment(n, k, v) {
+export function commitment(owner_pk, k, v) {
     let deferred5_0;
     let deferred5_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(n, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr0 = passStringToWasm0(owner_pk, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(k, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len1 = WASM_VECTOR_LEN;
@@ -39,9 +39,9 @@ export function commitment(n, k, v) {
 }
 
 /**
- * Decrypt / scan a note blob with a viewing secret. Returns `{ n, k, v }`, or
- * throws if the blob is not addressed to this key. Used by recipients (note
- * discovery) and auditors (compliance disclosure).
+ * Decrypt / scan a note blob with a viewing secret. Returns
+ * `{ owner_pk, n, k, v }`, where `n` is a backward-compatible alias for
+ * `owner_pk`, or throws if the blob is not addressed to this key.
  * @param {string} view_secret
  * @param {string} blob
  * @returns {string}
@@ -113,21 +113,22 @@ export function deposit_proof(pk, params_json) {
 
 /**
  * Encrypt a note to a recipient's viewing pubkey. Returns the on-chain blob
- * (`eph_pub || ciphertext`) as `0x`-hex.
+ * (`eph_pub || ciphertext`) as `0x`-hex. The plaintext is `owner_pk || k || v`;
+ * the spend key is never encrypted.
  * @param {string} recipient_view
- * @param {string} n
+ * @param {string} owner_pk
  * @param {string} k
  * @param {string} v
  * @returns {string}
  */
-export function encrypt_note_blob(recipient_view, n, k, v) {
+export function encrypt_note_blob(recipient_view, owner_pk, k, v) {
     let deferred6_0;
     let deferred6_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passStringToWasm0(recipient_view, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(n, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr1 = passStringToWasm0(owner_pk, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passStringToWasm0(k, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len2 = WASM_VECTOR_LEN;
@@ -187,18 +188,86 @@ export function keygen(seed) {
 }
 
 /**
- * Nullifier `nf = Poseidon(n, 0)` as `0x`-hex.
- * @param {string} n
+ * Merkle root over an ordered JSON array of `0x` leaf commitments (DEPTH=20).
+ * Empty array → empty-tree root. Used by hypertron-indexer for root verification.
+ * @param {string} leaves_json
  * @returns {string}
  */
-export function nullifier(n) {
+export function merkle_root(leaves_json) {
     let deferred3_0;
     let deferred3_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(n, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr0 = passStringToWasm0(leaves_json, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
         const len0 = WASM_VECTOR_LEN;
-        wasm.nullifier(retptr, ptr0, len0);
+        wasm.merkle_root(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export2(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * Nullifier `nf = Poseidon(spend_sk, k)` as `0x`-hex.
+ * @param {string} spend_sk
+ * @param {string} k
+ * @returns {string}
+ */
+export function nullifier(spend_sk, k) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(spend_sk, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(k, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.nullifier(retptr, ptr0, len0, ptr1, len1);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr3 = r0;
+        var len3 = r1;
+        if (r3) {
+            ptr3 = 0; len3 = 0;
+            throw takeObject(r2);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export2(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * Derive `owner_pk = Poseidon(spend_sk, 0)` as `0x`-hex.
+ * @param {string} spend_sk
+ * @returns {string}
+ */
+export function owner_pk(spend_sk) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(spend_sk, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.owner_pk(retptr, ptr0, len0);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -224,6 +293,78 @@ export function nullifier(n) {
  */
 export function start() {
     wasm.start();
+}
+
+/**
+ * Prove a 2-in / 2-out private transfer.
+ * Public inputs order: `[root, nf_1, nf_2, out_cm1, out_cm2]`.
+ * @param {Uint8Array} pk
+ * @param {string} params_json
+ * @returns {string}
+ */
+export function transfer_2_proof(pk, params_json) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArray8ToWasm0(pk, wasm.__wbindgen_export3);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(params_json, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.transfer_2_proof(retptr, ptr0, len0, ptr1, len1);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr3 = r0;
+        var len3 = r1;
+        if (r3) {
+            ptr3 = 0; len3 = 0;
+            throw takeObject(r2);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export2(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * Prove a 4-in / 2-out private transfer.
+ * Public inputs order: `[root, nf_1, nf_2, nf_3, nf_4, out_cm1, out_cm2]`.
+ * @param {Uint8Array} pk
+ * @param {string} params_json
+ * @returns {string}
+ */
+export function transfer_4_proof(pk, params_json) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArray8ToWasm0(pk, wasm.__wbindgen_export3);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(params_json, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.transfer_4_proof(retptr, ptr0, len0, ptr1, len1);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr3 = r0;
+        var len3 = r1;
+        if (r3) {
+            ptr3 = 0; len3 = 0;
+            throw takeObject(r2);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export2(deferred4_0, deferred4_1, 1);
+    }
 }
 
 /**

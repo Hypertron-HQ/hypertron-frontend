@@ -1,48 +1,55 @@
+import { ArrowUpRight } from "lucide-react";
 import { FreighterSignupDialog } from "@/components/auth/freighter-signup-dialog";
-import { Button } from "@/components/ui/button";
-import { BOOK_DEMO } from "./constants";
 
 const links = [
   { href: "#product", label: "Product" },
-  { href: "#how", label: "How it works" },
-  { href: "#start", label: "Get started" },
+  { href: "/developers", label: "Developers" },
+  { href: "#protocol", label: "Protocol" },
+  { href: "/developers", label: "Docs" },
+  { href: "#about", label: "About" },
 ] as const;
+
+function LogoMark() {
+  return (
+    <span aria-hidden className="grid grid-cols-2 gap-[2px]">
+      <span className="size-1.5 bg-current" />
+      <span className="size-1.5 bg-current" />
+      <span className="size-1.5 bg-current" />
+      <span className="size-1.5 bg-current" />
+    </span>
+  );
+}
 
 export function LandingNavbar() {
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-line bg-black/40 px-4 backdrop-blur-xl sm:px-6">
+    <header className="landing-nav fixed inset-x-0 top-0 z-50">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-5 sm:px-8">
         <a
           href="#home"
-          className="font-display text-base font-medium tracking-tight text-fog"
+          className="landing-nav-ink inline-flex items-center gap-2.5 font-display text-[15px] font-medium tracking-[0.14em] uppercase"
         >
+          <LogoMark />
           Hypertron
         </a>
 
-        <nav className="hidden items-center gap-7 text-sm text-mist md:flex">
+        <nav className="hidden items-center gap-7 md:flex">
           {links.map((link) => (
             <a
-              key={link.href}
+              key={`${link.href}-${link.label}`}
               href={link.href}
-              className="transition-colors hover:text-fog"
+              className="landing-nav-ink text-[11px] font-medium tracking-[0.18em] uppercase transition-opacity hover:opacity-60"
             >
               {link.label}
             </a>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Button
-            variant="glass"
-            size="sm"
-            className="hidden h-9 px-4 sm:inline-flex"
-            asChild
-          >
-            <a href={BOOK_DEMO} target="_blank" rel="noopener noreferrer">
-              Book a Demo
-            </a>
-          </Button>
-          <FreighterSignupDialog />
+        <div className="landing-launch">
+          <FreighterSignupDialog triggerLabel="Launch app" />
+          <ArrowUpRight
+            aria-hidden
+            className="landing-launch-arrow pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2"
+          />
         </div>
       </div>
     </header>

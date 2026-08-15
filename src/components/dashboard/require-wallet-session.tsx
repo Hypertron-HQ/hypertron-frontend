@@ -12,13 +12,16 @@ import { fetchAuthMe, type WalletSession } from "@/lib/auth";
 
 export function RequireWalletSession({
   children,
+  unauthenticated,
 }: {
   children: (
     session: WalletSession,
     profile: BusinessProfile,
   ) => ReactNode;
+  unauthenticated?: ReactNode;
 }) {
   const router = useRouter();
+  const allowUnauthenticated = unauthenticated !== undefined;
   const [session, setSession] = useState<WalletSession | null | undefined>(
     undefined,
   );
@@ -34,7 +37,11 @@ export function RequireWalletSession({
       const next = await fetchAuthMe();
       if (cancelled) return;
       if (!next) {
-        router.replace("/");
+        if (allowUnauthenticated) {
+          setSession(null);
+        } else {
+          router.replace("/");
+        }
         return;
       }
       setSession(next);
@@ -52,17 +59,25 @@ export function RequireWalletSession({
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [allowUnauthenticated, router]);
 
-  if (session === undefined || profile === undefined) {
+  if (session === undefined) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
-        Loading dashboard…
+        Loading…
       </div>
     );
   }
 
-  if (!session) return null;
+  if (!session) return <>{unauthenticated ?? null}</>;
+
+  if (profile === undefined) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
+        Loading…
+      </div>
+    );
+  }
 
   if (loadError || profile === null) {
     return (

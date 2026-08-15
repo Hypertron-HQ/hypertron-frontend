@@ -7,12 +7,7 @@ import { LandingProduct } from "@/components/landing/product";
 
 export default function Home() {
   return (
-    <div className="relative flex min-h-full flex-1 flex-col overflow-x-hidden bg-void text-fog">
-      <div
-        aria-hidden
-        className="landing-atmosphere pointer-events-none fixed inset-0"
-      />
-
+    <div className="landing-root relative flex min-h-full flex-1 flex-col overflow-x-clip">
       <LandingNavbar />
 
       <main className="relative z-10 flex flex-1 flex-col">

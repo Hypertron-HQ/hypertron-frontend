@@ -1,4 +1,5 @@
 import { apiFetch, getApiBaseUrl } from "@/lib/api";
+import { getDeveloperApiBaseUrl } from "@/lib/developer-api";
 
 export type PaymentLinkCreated = {
   linkId: string;
@@ -11,6 +12,9 @@ export type PaymentLinkCreated = {
   paymentMethods: string[];
   destinationAddress: string;
   mode: string;
+  shieldSalt?: string | null;
+  shieldCommitment?: string | null;
+  shieldProof?: string | null;
 };
 
 export type PublicPaymentLink = {
@@ -29,6 +33,11 @@ export type PublicPaymentLink = {
   paidAt: string | null;
   paymentTxHash: string | null;
   privateSettlement: boolean;
+  shieldCommitment: string | null;
+  shieldProof: string | null;
+  viewPub: string | null;
+  /** Merchant owner_pk — required for private transfer payments. */
+  spendPub: string | null;
 };
 
 export type PaymentLinkListItem = {
@@ -44,8 +53,15 @@ export type PaymentLinkListItem = {
   linkMemo: string | null;
   paidAt: string | null;
   paymentTxHash: string | null;
+  claimedAt: string | null;
+  claimTxHash: string | null;
+  claimOutCommitment: string | null;
+  confirmedAt: string | null;
   createdAt: string;
   url: string;
+  shieldSalt?: string | null;
+  shieldCommitment?: string | null;
+  shieldProof?: string | null;
 };
 
 export type PaymentLinkStatus = "paid" | "pending" | "expired";
@@ -108,6 +124,9 @@ export async function createPaymentLink(input: {
   privateSettlement?: boolean;
   expiryDays?: string;
   workflowStage?: string;
+  shieldSalt?: string;
+  shieldCommitment?: string;
+  shieldProof?: string;
 }): Promise<
   { ok: true; link: PaymentLinkCreated } | { ok: false; error: string }
 > {
@@ -119,18 +138,25 @@ export async function createPaymentLink(input: {
         privateSettlement: input.privateSettlement,
       });
 
+    const body: Record<string, unknown> = {
+      businessId: input.businessId,
+      amount: input.amount,
+      currency: input.currency,
+      purpose: input.purpose,
+      clientName: input.clientName,
+      metadata,
+      expiryDays: input.expiryDays,
+      workflowStage: input.workflowStage,
+    };
+    if (input.privateSettlement) {
+      body.shieldSalt = input.shieldSalt;
+      body.shieldCommitment = input.shieldCommitment;
+      body.shieldProof = input.shieldProof;
+    }
+
     const res = await apiFetch("/api/payment-link", {
       method: "POST",
-      body: JSON.stringify({
-        businessId: input.businessId,
-        amount: input.amount,
-        currency: input.currency,
-        purpose: input.purpose,
-        clientName: input.clientName,
-        metadata,
-        expiryDays: input.expiryDays,
-        workflowStage: input.workflowStage,
-      }),
+      body: JSON.stringify(body),
     });
     const json = await readJson<PaymentLinkCreated>(res);
     if (!res.ok || !json.linkId || !json.url) {
@@ -186,8 +212,15 @@ export async function listPaymentLinks(
         linkMemo: link.linkMemo ?? null,
         paidAt: link.paidAt ?? null,
         paymentTxHash: link.paymentTxHash ?? null,
+        claimedAt: link.claimedAt ?? null,
+        claimTxHash: link.claimTxHash ?? null,
+        claimOutCommitment: link.claimOutCommitment ?? null,
+        confirmedAt: link.confirmedAt ?? null,
         createdAt: link.createdAt,
         url: link.url,
+        shieldSalt: link.shieldSalt ?? null,
+        shieldCommitment: link.shieldCommitment ?? null,
+        shieldProof: link.shieldProof ?? null,
       })),
     };
   } catch {
@@ -203,10 +236,14 @@ export async function getPublicPaymentLink(
   | { ok: false; error: string; expired?: boolean }
 > {
   try {
-    const res = await fetch(
-      `${getApiBaseUrl()}/api/payment-link/${encodeURIComponent(id)}`,
-      { method: "GET", credentials: "omit" },
-    );
+    // API-owned checkout links use cl_ prefix; Collect links stay on core.
+    const url = id.startsWith("cl_")
+      ? `${getDeveloperApiBaseUrl()}/v1/checkout-links/${encodeURIComponent(id)}`
+      : `${getApiBaseUrl()}/api/payment-link/${encodeURIComponent(id)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      credentials: "omit",
+    });
     const json = await readJson<{
       id?: string;
       amount?: string | null;
@@ -222,6 +259,10 @@ export async function getPublicPaymentLink(
       expiresAt?: string | null;
       paidAt?: string | null;
       paymentTxHash?: string | null;
+      shieldCommitment?: string | null;
+      shieldProof?: string | null;
+      viewPub?: string | null;
+      spendPub?: string | null;
     }>(res);
 
     if (res.status === 410 || json.expired) {
@@ -258,9 +299,93 @@ export async function getPublicPaymentLink(
         paidAt: json.paidAt ?? null,
         paymentTxHash: json.paymentTxHash ?? null,
         privateSettlement: parsePrivateSettlement(json.metadata),
+        shieldCommitment: json.shieldCommitment ?? null,
+        shieldProof: json.shieldProof ?? null,
+        viewPub: json.viewPub ?? null,
+        spendPub: json.spendPub ?? null,
       },
     };
   } catch {
     return { ok: false, error: "Could not reach the API." };
   }
+}
+
+/**
+ * Payer claims a link after successful transfer payment.
+ * Records the transfer tx hash and recipient note commitment.
+ */
+export async function claimPaymentLink(
+  id: string,
+  txHash: string,
+  outCommitment: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const url = `${getApiBaseUrl()}/api/payment-link/${encodeURIComponent(id)}/claim`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txHash, outCommitment }),
+    });
+    const json = await readJson<{ error?: string }>(res);
+    if (!res.ok) {
+      return { ok: false, error: json.error ?? "Claim failed." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Could not reach the API." };
+  }
+}
+
+/**
+ * Merchant marks a claimed link settled. Requires the owning session.
+ */
+export async function confirmPaymentLink(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await apiFetch(
+      `/api/payment-link/${encodeURIComponent(id)}/confirm`,
+      { method: "POST" },
+    );
+    const json = await readJson<{ error?: string }>(res);
+    if (!res.ok) {
+      return { ok: false, error: json.error ?? "Confirm failed." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Could not reach the API." };
+  }
+}
+
+function normalizeCommitment(value: string): string {
+  return value.trim().toLowerCase().replace(/^0x/, "");
+}
+
+/**
+ * Settle every claimed link whose output note the merchant can actually see.
+ *
+ * The payer records `claimOutCommitment` when they pay, but that alone is their
+ * word. Decrypting the matching note with our viewing key — and finding it in
+ * the tree — is the merchant-side proof that the money arrived, so that is what
+ * flips a link from claimed to paid. Returns how many links were confirmed.
+ */
+export async function confirmSettledLinks(
+  links: PaymentLinkListItem[],
+  settledCommitments: Iterable<string>,
+): Promise<number> {
+  const owned = new Set(
+    Array.from(settledCommitments, normalizeCommitment),
+  );
+  if (owned.size === 0) return 0;
+
+  let confirmed = 0;
+  for (const link of links) {
+    if (link.confirmedAt || link.paidAt) continue;
+    if (!link.claimedAt || !link.claimOutCommitment) continue;
+    if (!owned.has(normalizeCommitment(link.claimOutCommitment))) continue;
+
+    const res = await confirmPaymentLink(link.id);
+    if (res.ok) confirmed++;
+  }
+  return confirmed;
 }

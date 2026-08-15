@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +17,19 @@ import {
 
 type Step = "choose" | "connecting";
 
-export function FreighterSignupDialog() {
-  const router = useRouter();
+export function FreighterSignupDialog({
+  redirectTo = "/dashboard",
+  triggerLabel = "Sign up",
+  eyebrow = "Create account",
+  title = "Sign up with Freighter",
+  description = "Connect your Stellar wallet and sign a one-time challenge to continue.",
+}: {
+  redirectTo?: string;
+  triggerLabel?: string;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("choose");
   const [status, setStatus] = useState<string | null>(null);
@@ -54,28 +64,27 @@ export function FreighterSignupDialog() {
     setOpen(false);
     setStep("choose");
     setStatus(null);
-    router.push("/dashboard");
+    window.location.assign(redirectTo);
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="fog" size="sm" className="h-9 px-4">
-          Sign up
+          {triggerLabel}
         </Button>
       </DialogTrigger>
 
       <DialogContent className="gap-0 overflow-hidden border-line bg-navy p-0 text-fog sm:max-w-md">
         <DialogHeader className="border-b border-line px-5 py-4 text-left">
           <p className="text-xs font-medium tracking-[0.16em] text-yellow uppercase">
-            Create account
+            {eyebrow}
           </p>
           <DialogTitle className="font-display text-xl tracking-tight text-fog">
-            Sign up with Freighter
+            {title}
           </DialogTitle>
           <DialogDescription className="text-mist">
-            Connect your Stellar wallet and sign a one-time challenge to open
-            the dashboard.
+            {description}
           </DialogDescription>
         </DialogHeader>
 

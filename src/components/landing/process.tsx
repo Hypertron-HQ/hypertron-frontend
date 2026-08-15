@@ -1,3 +1,5 @@
+import { ScrollFade } from "./reveal";
+
 const steps = [
   {
     label: "Onboard",
@@ -15,40 +17,36 @@ const steps = [
 
 export function LandingProcess() {
   return (
-    <section id="how" className="relative border-t border-line bg-ink/60">
-      <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-        <div className="max-w-xl">
-          <p className="text-xs font-medium tracking-[0.18em] text-haze uppercase">
+    <section id="protocol" className="landing-paper relative">
+      <div className="landing-paper-grid pointer-events-none absolute inset-0 opacity-70" />
+
+      <div className="relative mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8 sm:py-12">
+        <ScrollFade className="max-w-xl border-t border-[#d5dce6] pt-16">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[#7b8696] uppercase">
             How it works
           </p>
-          <h2 className="mt-4 font-display text-3xl tracking-tight text-fog sm:text-4xl">
-            From signup to{" "}
-            <em className="font-serif font-normal italic">settlement</em> in
-            three moves.
+          <h2 className="mt-4 font-display text-[clamp(2rem,4vw,3.4rem)] leading-[0.96] tracking-[-0.035em] text-[#1c2433]">
+            From signup to settlement
+            <br />
+            in three moves.
           </h2>
-        </div>
+        </ScrollFade>
 
-        <ol className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
+        <ol className="mt-20 grid gap-16 border-t border-[#d5dce6] py-16 sm:grid-cols-3 sm:gap-10">
           {steps.map((step, index) => (
-            <li key={step.label} className="relative">
-              {index < steps.length - 1 ? (
-                <span
-                  aria-hidden
-                  className="absolute top-3 left-[calc(100%+0.5rem)] hidden h-px w-[calc(100%-1rem)] bg-gradient-to-r from-line via-blue/40 to-transparent sm:block"
-                />
-              ) : null}
-              <div className="mb-4 flex items-baseline gap-3">
-                <span className="font-display text-sm tracking-wide text-yellow">
+            <ScrollFade key={step.label} from={0.93} to={0.5} lag={index * 0.14}>
+              <li>
+                <p className="text-[11px] tracking-[0.18em] text-blue uppercase">
                   0{index + 1}
-                </span>
-                <h3 className="text-xl font-medium tracking-tight text-fog">
+                </p>
+                <h3 className="mt-4 font-display text-2xl tracking-tight text-[#1c2433]">
                   {step.label}
                 </h3>
-              </div>
-              <p className="max-w-xs text-sm leading-relaxed text-mist">
-                {step.copy}
-              </p>
-            </li>
+                <p className="mt-3 max-w-xs text-sm leading-relaxed text-[#5c6778]">
+                  {step.copy}
+                </p>
+              </li>
+            </ScrollFade>
           ))}
         </ol>
       </div>
