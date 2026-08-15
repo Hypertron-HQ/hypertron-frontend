@@ -19,6 +19,20 @@ function getTransferPkUrl(): string {
   );
 }
 
+function getTransfer2PkUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_TRANSFER_2_PK_URL?.trim() ||
+    "/keys/transfer-2.pk.bin"
+  );
+}
+
+function getTransfer4PkUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_TRANSFER_4_PK_URL?.trim() ||
+    "/keys/transfer-4.pk.bin"
+  );
+}
+
 function getWasmUrl(): string {
   return (
     process.env.NEXT_PUBLIC_PROVER_WASM_URL?.trim() ||
@@ -311,6 +325,143 @@ export async function buildTransferProof(input: {
       error instanceof Error
         ? error.message
         : "Could not build transfer proof.";
+    return { ok: false, error: message };
+  }
+}
+
+export type TransferNProofResult = {
+  arity: 2 | 4;
+  root: string;
+  nullifiers: string[];
+  outCm1: string;
+  outCm2: string;
+  proof: string;
+  recipientBlob: string;
+  changeBlob: string;
+  out1: { ownerPk: string; k: string; v: string };
+  out2: { ownerPk: string; k: string; v: string };
+};
+
+/**
+ * Build a 2-in or 4-in private transfer proof. Inputs must share one spend key
+ * and one Merkle root. Public inputs: [root, nf_1, …, nf_N, out_cm1, out_cm2].
+ */
+export async function buildTransferNProof(input: {
+  arity: 2 | 4;
+  spendSk: string;
+  notes: { k: string; v: string; leafIndex: number }[];
+  leaves: string[];
+  out1OwnerPk: string;
+  out1V: string;
+  out2OwnerPk: string;
+  out2V: string;
+  recipientViewPub: string;
+  selfViewPub: string;
+}): Promise<
+  { ok: true; result: TransferNProofResult } | { ok: false; error: string }
+> {
+  try {
+    if (input.notes.length !== input.arity) {
+      return {
+        ok: false,
+        error: `Expected ${input.arity} notes, got ${input.notes.length}.`,
+      };
+    }
+    for (const n of input.notes) {
+      if (n.leafIndex < 0 || n.leafIndex >= input.leaves.length) {
+        return { ok: false, error: "Leaf index is out of range for the tree." };
+      }
+    }
+
+    const out1K = randomFieldElementHex();
+    const out2K = randomFieldElementHex();
+    const op = input.arity === 2 ? "transfer2" : "transfer4";
+    const pkUrl = input.arity === 2 ? getTransfer2PkUrl() : getTransfer4PkUrl();
+
+    const proved = await proveInWorker(
+      op,
+      pkUrl,
+      JSON.stringify({
+        spend_sk: input.spendSk,
+        inputs: input.notes.map((n) => ({
+          k: n.k,
+          v: n.v,
+          index: n.leafIndex,
+        })),
+        leaves: input.leaves,
+        out1_owner_pk: input.out1OwnerPk,
+        out1_k: out1K,
+        out1_v: input.out1V,
+        out2_owner_pk: input.out2OwnerPk,
+        out2_k: out2K,
+        out2_v: input.out2V,
+        recipient_view: input.recipientViewPub,
+        self_view: input.selfViewPub,
+      }),
+    );
+    if (!proved.ok) return { ok: false, error: proved.error };
+
+    const out = JSON.parse(proved.resultJson) as {
+      root?: string;
+      nullifiers?: string[];
+      out_cm1?: string;
+      out_cm2?: string;
+      proof?: string;
+      recipient_blob?: string;
+      change_blob?: string;
+      public_inputs?: string[];
+    };
+
+    const root = out.root || out.public_inputs?.[0] || "";
+    const nullifiers =
+      out.nullifiers ||
+      (out.public_inputs ?? []).slice(1, 1 + input.arity);
+    const outCm1 =
+      out.out_cm1 || out.public_inputs?.[1 + input.arity] || "";
+    const outCm2 =
+      out.out_cm2 || out.public_inputs?.[2 + input.arity] || "";
+    const proof = out.proof || "";
+
+    if (
+      !root ||
+      nullifiers.length !== input.arity ||
+      !outCm1 ||
+      !outCm2 ||
+      !proof
+    ) {
+      return {
+        ok: false,
+        error: "Prover returned an incomplete multi-input transfer proof.",
+      };
+    }
+    if (!out.recipient_blob || !out.change_blob) {
+      return {
+        ok: false,
+        error:
+          "Prover build is out of date: it did not return the encrypted note blobs. Run `pnpm prover:sync`.",
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        arity: input.arity,
+        root,
+        nullifiers,
+        outCm1,
+        outCm2,
+        proof,
+        recipientBlob: out.recipient_blob,
+        changeBlob: out.change_blob,
+        out1: { ownerPk: input.out1OwnerPk, k: out1K, v: input.out1V },
+        out2: { ownerPk: input.out2OwnerPk, k: out2K, v: input.out2V },
+      },
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Could not build multi-input transfer proof.";
     return { ok: false, error: message };
   }
 }

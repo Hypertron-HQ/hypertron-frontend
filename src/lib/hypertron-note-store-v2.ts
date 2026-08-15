@@ -166,6 +166,58 @@ export async function findSpendableNote(
   return candidates[0];
 }
 
+export type NoteSelection =
+  | { ok: true; notes: StoredNoteV2[] }
+  | { ok: false; reason: "insufficient" | "need_fourth" };
+
+/**
+ * Smallest set of confirmed notes whose values sum to ≥ amount, with size in
+ * {1, 2, 4}. Three-note payments take a fourth owned note when one exists;
+ * otherwise the caller must top up.
+ */
+export function selectNotesForAmount(
+  notes: StoredNoteV2[],
+  amountBaseUnits: string,
+): NoteSelection {
+  const amount = BigInt(amountBaseUnits);
+  const ready = notes
+    .filter((n) => !n.spent && n.leafIndex != null)
+    .slice()
+    .sort((a, b) => {
+      const d = BigInt(a.amountBaseUnits) - BigInt(b.amountBaseUnits);
+      return d < 0n ? -1 : d > 0n ? 1 : 0;
+    });
+
+  const value = (n: StoredNoteV2) => BigInt(n.amountBaseUnits);
+  const sum = (xs: StoredNoteV2[]) =>
+    xs.reduce((s, n) => s + value(n), BigInt(0));
+
+  const one = ready.find((n) => value(n) >= amount);
+  if (one) return { ok: true, notes: [one] };
+
+  for (let i = 0; i < ready.length; i++) {
+    for (let j = i + 1; j < ready.length; j++) {
+      if (sum([ready[i], ready[j]]) >= amount) {
+        return { ok: true, notes: [ready[i], ready[j]] };
+      }
+    }
+  }
+
+  const acc: StoredNoteV2[] = [];
+  for (const n of ready) {
+    acc.push(n);
+    if (sum(acc) < amount) continue;
+    if (acc.length === 3) {
+      const extra = ready.find((x) => !acc.includes(x));
+      if (!extra) return { ok: false, reason: "need_fourth" };
+      return { ok: true, notes: [...acc, extra] };
+    }
+    if (acc.length === 4) return { ok: true, notes: acc };
+    return { ok: false, reason: "insufficient" };
+  }
+  return { ok: false, reason: "insufficient" };
+}
+
 /**
  * Get wallet balance summary.
  */

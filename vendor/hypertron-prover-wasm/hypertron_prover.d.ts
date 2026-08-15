@@ -55,6 +55,18 @@ export function owner_pk(spend_sk: string): string;
 export function start(): void;
 
 /**
+ * Prove a 2-in / 2-out private transfer.
+ * Public inputs order: `[root, nf_1, nf_2, out_cm1, out_cm2]`.
+ */
+export function transfer_2_proof(pk: Uint8Array, params_json: string): string;
+
+/**
+ * Prove a 4-in / 2-out private transfer.
+ * Public inputs order: `[root, nf_1, nf_2, nf_3, nf_4, out_cm1, out_cm2]`.
+ */
+export function transfer_4_proof(pk: Uint8Array, params_json: string): string;
+
+/**
  * Prove a fully-private note -> two notes transfer.
  * Public inputs order: `[root, nullifier, out_cm1, out_cm2]`.
  */
@@ -79,6 +91,8 @@ export interface InitOutput {
     readonly nullifier: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly owner_pk: (a: number, b: number, c: number) => void;
     readonly start: () => void;
+    readonly transfer_2_proof: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly transfer_4_proof: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly transfer_proof: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly unshield_proof: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly __wbindgen_export: (a: number) => void;

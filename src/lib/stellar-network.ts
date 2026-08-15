@@ -32,7 +32,7 @@ export function getSorobanRpcUrl(): string {
 export function getPaymentPoolAddress(): string {
   return (
     process.env.NEXT_PUBLIC_PAYMENT_POOL_ADDRESS?.trim() ||
-    "CCXVZOJB67J7ZBQG2UTZCFJ3ZSAMDLSBB62B7KLZNNLO4WQDD3KX6BYP"
+    "CB2SVTMGQKQVLUHWC5J7K5NOHPXULWEJL452B457NCRW7OKJ42XSVOLL"
   );
 }
 

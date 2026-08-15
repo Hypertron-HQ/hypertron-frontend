@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FREIGHTER_INSTALL_URL } from "@/lib/freighter-connect";
 import { connectFreighterWallet, signAndSubmitXdr } from "@/lib/freighter-tx";
-import { submitPoolDeposit, submitPoolTransfer } from "@/lib/hypertron-pool";
+import { submitPoolDeposit, submitPoolTransfer, submitPoolTransferN } from "@/lib/hypertron-pool";
 import {
   getPublicPaymentLink,
   claimPaymentLink,
@@ -28,12 +28,13 @@ import {
 } from "@/lib/stellar-network";
 import { cn } from "@/lib/utils";
 import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
-import { buildTransferProof } from "@/lib/hypertron-prover";
+import { buildTransferProof, buildTransferNProof } from "@/lib/hypertron-prover";
 import { getPoolLeaves } from "@/lib/hypertron-indexer";
 import {
-  findSpendableNote,
+  listUnspentNotesV2,
   putNoteV2,
   markNoteSpent,
+  selectNotesForAmount,
   type StoredNoteV2,
 } from "@/lib/hypertron-note-store-v2";
 import { fullScan } from "@/lib/hypertron-note-scan";
@@ -54,7 +55,10 @@ export function PaymentCheckout({ linkId }: Props) {
   const [viewPub, setViewPub] = useState<string | null>(null);
   const [spendSecret, setSpendSecret] = useState<string | null>(null);
   const [spendPub, setSpendPub] = useState<string | null>(null);
-  const [spendableNote, setSpendableNote] = useState<StoredNoteV2 | null>(null);
+  const [spendableNotes, setSpendableNotes] = useState<StoredNoteV2[] | null>(
+    null,
+  );
+  const [notePickError, setNotePickError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
@@ -101,8 +105,19 @@ export function PaymentCheckout({ linkId }: Props) {
       setScanning(true);
       try {
         await fullScan(walletAddr, secret, spendSk);
-        const note = await findSpendableNote(walletAddr, amountNeeded);
-        setSpendableNote(note);
+        const unspent = await listUnspentNotesV2(walletAddr);
+        const pick = selectNotesForAmount(unspent, amountNeeded);
+        if (pick.ok) {
+          setSpendableNotes(pick.notes);
+          setNotePickError(null);
+        } else {
+          setSpendableNotes(null);
+          setNotePickError(
+            pick.reason === "need_fourth"
+              ? "This payment needs four notes (or a larger one). You have three ready notes — top up once more, or wait for another note to confirm."
+              : null,
+          );
+        }
       } finally {
         setScanning(false);
       }
@@ -179,7 +194,7 @@ export function PaymentCheckout({ linkId }: Props) {
 
         const amountBaseUnits = toBaseUnits(link.amount);
 
-        if (spendableNote && spendSecret && spendPub && viewPub && link.viewPub && link.spendPub) {
+        if (spendableNotes && spendSecret && spendPub && viewPub && link.viewPub && link.spendPub) {
           await handleTransferPay(amountBaseUnits);
         } else if (link.shieldCommitment && link.shieldProof) {
           await handleDepositPay(amountBaseUnits);
@@ -244,7 +259,8 @@ export function PaymentCheckout({ linkId }: Props) {
     if (
       !link ||
       !wallet ||
-      !spendableNote ||
+      !spendableNotes ||
+      spendableNotes.length === 0 ||
       !spendSecret ||
       !spendPub ||
       !viewPub ||
@@ -262,14 +278,18 @@ export function PaymentCheckout({ linkId }: Props) {
       return;
     }
 
-    const leafIndex = spendableNote.leafIndex;
-    if (leafIndex == null) {
-      setError("Note is not yet confirmed on-chain. Try again shortly.");
-      setStatus(null);
-      return;
+    for (const note of spendableNotes) {
+      if (note.leafIndex == null) {
+        setError("Note is not yet confirmed on-chain. Try again shortly.");
+        setStatus(null);
+        return;
+      }
     }
 
-    const inputV = BigInt(spendableNote.amountBaseUnits);
+    const inputV = spendableNotes.reduce(
+      (s, n) => s + BigInt(n.amountBaseUnits),
+      BigInt(0),
+    );
     const payV = BigInt(amountBaseUnits);
     const changeV = inputV - payV;
 
@@ -279,12 +299,23 @@ export function PaymentCheckout({ linkId }: Props) {
       return;
     }
 
-    setStatus("Building transfer proof (10-15s)…");
-    const proofResult = await buildTransferProof({
+    const arity = spendableNotes.length;
+    if (arity !== 1 && arity !== 2 && arity !== 4) {
+      setError("Internal error: unsupported note set size.");
+      setStatus(null);
+      return;
+    }
+
+    const provingStatus =
+      arity === 4
+        ? "Building 4-input transfer proof (this can take a minute)…"
+        : arity === 2
+          ? "Building 2-input transfer proof (20-30s)…"
+          : "Building transfer proof (10-15s)…";
+    setStatus(provingStatus);
+
+    const common = {
       spendSk: spendSecret,
-      k: spendableNote.k,
-      v: spendableNote.amountBaseUnits,
-      leafIndex,
       leaves: leavesRes.data.leaves,
       out1OwnerPk: link.spendPub,
       out1V: amountBaseUnits,
@@ -292,42 +323,104 @@ export function PaymentCheckout({ linkId }: Props) {
       out2V: changeV.toString(),
       recipientViewPub: link.viewPub,
       selfViewPub: viewPub,
-    });
+    };
 
-    if (!proofResult.ok) {
-      setError(proofResult.error);
+    let root: string;
+    let outCm1: string;
+    let outCm2: string;
+    let proof: string;
+    let recipientBlob: string;
+    let changeBlob: string;
+    let out2: { ownerPk: string; k: string; v: string };
+    let nullifiers: string[];
+    let submit:
+      | { ok: true; hash: string }
+      | { ok: false; error: string };
+
+    if (arity === 1) {
+      const note = spendableNotes[0];
+      const proofResult = await buildTransferProof({
+        ...common,
+        k: note.k,
+        v: note.amountBaseUnits,
+        leafIndex: note.leafIndex!,
+      });
+      if (!proofResult.ok) {
+        setError(proofResult.error);
+        setStatus(null);
+        return;
+      }
+      root = proofResult.result.root;
+      outCm1 = proofResult.result.outCm1;
+      outCm2 = proofResult.result.outCm2;
+      proof = proofResult.result.proof;
+      recipientBlob = proofResult.result.recipientBlob;
+      changeBlob = proofResult.result.changeBlob;
+      out2 = proofResult.result.out2;
+      nullifiers = [proofResult.result.nullifier];
+      setStatus("Sign transfer in Freighter…");
+      submit = await submitPoolTransfer({
+        fromAddress: wallet,
+        proofHex: proof,
+        rootHex: root,
+        nullifierHex: nullifiers[0],
+        outCommitment1Hex: outCm1,
+        outCommitment2Hex: outCm2,
+        note1BlobHex: recipientBlob,
+        note2BlobHex: changeBlob,
+      });
+    } else {
+      const proofResult = await buildTransferNProof({
+        ...common,
+        arity,
+        notes: spendableNotes.map((n) => ({
+          k: n.k,
+          v: n.amountBaseUnits,
+          leafIndex: n.leafIndex!,
+        })),
+      });
+      if (!proofResult.ok) {
+        setError(proofResult.error);
+        setStatus(null);
+        return;
+      }
+      root = proofResult.result.root;
+      outCm1 = proofResult.result.outCm1;
+      outCm2 = proofResult.result.outCm2;
+      proof = proofResult.result.proof;
+      recipientBlob = proofResult.result.recipientBlob;
+      changeBlob = proofResult.result.changeBlob;
+      out2 = proofResult.result.out2;
+      nullifiers = proofResult.result.nullifiers;
+      setStatus("Sign transfer in Freighter…");
+      submit = await submitPoolTransferN({
+        fromAddress: wallet,
+        proofHex: proof,
+        rootHex: root,
+        nullifierHexes: nullifiers,
+        outCommitment1Hex: outCm1,
+        outCommitment2Hex: outCm2,
+        note1BlobHex: recipientBlob,
+        note2BlobHex: changeBlob,
+      });
+    }
+
+    if (!submit.ok) {
+      setError(submit.error);
       setStatus(null);
       return;
     }
 
-    const { result } = proofResult;
-
-    setStatus("Sign transfer in Freighter…");
-    const submitted = await submitPoolTransfer({
-      fromAddress: wallet,
-      proofHex: result.proof,
-      rootHex: result.root,
-      nullifierHex: result.nullifier,
-      outCommitment1Hex: result.outCm1,
-      outCommitment2Hex: result.outCm2,
-      note1BlobHex: result.recipientBlob,
-      note2BlobHex: result.changeBlob,
-    });
-
-    if (!submitted.ok) {
-      setError(submitted.error);
-      setStatus(null);
-      return;
+    for (const note of spendableNotes) {
+      await markNoteSpent(note.commitment);
     }
-
-    await markNoteSpent(spendableNote.commitment);
 
     if (changeV > BigInt(0)) {
       const changeNote: StoredNoteV2 = {
-        commitment: result.outCm2,
+        commitment: outCm2,
         ownerWallet: wallet,
-        ownerPk: result.out2.ownerPk,
-        k: result.out2.k,
+        ownerPk: out2.ownerPk,
+        k: out2.k,
         amount: fromBaseUnits(changeV.toString()),
         amountBaseUnits: changeV.toString(),
         leafIndex: null,
@@ -338,15 +431,11 @@ export function PaymentCheckout({ linkId }: Props) {
       await putNoteV2(changeNote);
     }
 
-    setTxHash(submitted.hash);
-    setSpendableNote(null);
+    setTxHash(submit.hash);
+    setSpendableNotes(null);
     setStatus("Private transfer submitted. Claiming link…");
 
-    const claimed = await claimPaymentLink(
-      link.id,
-      submitted.hash,
-      result.outCm1,
-    );
+    const claimed = await claimPaymentLink(link.id, submit.hash, outCm1);
     if (!claimed.ok) {
       console.warn("Claim failed:", claimed.error);
     }
@@ -415,7 +504,7 @@ export function PaymentCheckout({ linkId }: Props) {
         {link.privateSettlement ? (
           <>
             <Shield className="size-3.5" />
-            {spendableNote
+            {spendableNotes
               ? "Private transfer · amount hidden"
               : "Private settlement · pool deposit"}
           </>
@@ -434,15 +523,26 @@ export function PaymentCheckout({ linkId }: Props) {
               <Loader2 className="size-3.5 animate-spin" />
               Checking shielded balance…
             </p>
-          ) : spendableNote ? (
+          ) : spendableNotes ? (
             <div>
               <p className="font-medium text-emerald-700">
                 Using shielded balance
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Paying from note: {fromBaseUnits(spendableNote.amountBaseUnits)}{" "}
+                Paying from {spendableNotes.length} note
+                {spendableNotes.length === 1 ? "" : "s"}:{" "}
+                {fromBaseUnits(
+                  spendableNotes
+                    .reduce((s, n) => s + BigInt(n.amountBaseUnits), BigInt(0))
+                    .toString(),
+                )}{" "}
                 XLM (amount will be hidden)
               </p>
+            </div>
+          ) : notePickError ? (
+            <div>
+              <p className="font-medium text-amber-700">Need another note</p>
+              <p className="mt-1 text-xs text-slate-500">{notePickError}</p>
             </div>
           ) : link.shieldCommitment && link.shieldProof ? (
             <div>
@@ -525,7 +625,7 @@ export function PaymentCheckout({ linkId }: Props) {
                   !link.amount ||
                   scanning ||
                   (link.privateSettlement &&
-                    !spendableNote &&
+                    !spendableNotes &&
                     (!link.shieldCommitment || !link.shieldProof))
                 }
                 className="h-11 w-full bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
@@ -537,7 +637,7 @@ export function PaymentCheckout({ linkId }: Props) {
                     Working…
                   </span>
                 ) : link.privateSettlement ? (
-                  spendableNote ? (
+                  spendableNotes ? (
                     "Pay privately"
                   ) : (
                     "Shield & pay"

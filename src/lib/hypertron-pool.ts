@@ -267,3 +267,49 @@ export async function submitPoolTransfer(input: {
     ),
   );
 }
+
+/**
+ * Private N-in / 2-out transfer (2 or 4 spent notes). Amount is NOT visible.
+ */
+export async function submitPoolTransferN(input: {
+  fromAddress: string;
+  proofHex: string;
+  rootHex: string;
+  nullifierHexes: string[];
+  outCommitment1Hex: string;
+  outCommitment2Hex: string;
+  note1BlobHex: string;
+  note2BlobHex: string;
+}): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+  const n = input.nullifierHexes.length;
+  if (n !== 2 && n !== 4) {
+    return { ok: false, error: "transfer_n requires 2 or 4 nullifiers." };
+  }
+  const proof = hexToUint8(input.proofHex);
+  const root = hexToUint8(input.rootHex);
+  const nullifiers = input.nullifierHexes.map(hexToUint8);
+  const outCm1 = hexToUint8(input.outCommitment1Hex);
+  const outCm2 = hexToUint8(input.outCommitment2Hex);
+  const note1 = hexToUint8(input.note1BlobHex);
+  const note2 = hexToUint8(input.note2BlobHex);
+
+  if (root.length !== 32 || nullifiers.some((nf) => nf.length !== 32)) {
+    return { ok: false, error: "Root and nullifiers must be 32 bytes." };
+  }
+  if (outCm1.length !== 32 || outCm2.length !== 32) {
+    return { ok: false, error: "Output commitments must be 32 bytes." };
+  }
+
+  return signAndSend(input.fromAddress, (contract) =>
+    contract.call(
+      "transfer_n",
+      nativeToScVal(proof, { type: "bytes" }),
+      nativeToScVal(root, { type: "bytes" }),
+      nativeToScVal(nullifiers),
+      nativeToScVal(outCm1, { type: "bytes" }),
+      nativeToScVal(outCm2, { type: "bytes" }),
+      nativeToScVal(note1, { type: "bytes" }),
+      nativeToScVal(note2, { type: "bytes" }),
+    ),
+  );
+}

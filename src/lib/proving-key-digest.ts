@@ -12,12 +12,14 @@
  * (`artifacts.<circuit>.pk_sha256`) and must be updated whenever keys rotate.
  */
 
-export type ProveOp = "deposit" | "unshield" | "transfer";
+export type ProveOp = "deposit" | "unshield" | "transfer" | "transfer2" | "transfer4";
 
 const BUILT_IN_SHA256: Record<ProveOp, string> = {
   deposit: "e6298d202bc2adfddca71852c0618eee75961414d39a54ccc7046dd26599e74c",
   unshield: "e87b827477da9ba519ee073ad453f87ac19883b9bf249df9db95e68a366a80ae",
   transfer: "93f01949aab2ca60b67b24306d9c9baa1931c351d1e8ca622e13a5ea3046bfa2",
+  transfer2: "c0c5b8c921f8a207cb68f6ee8fe30a0c27ee77682d9fa7d7570a2d71893a30b2",
+  transfer4: "a3ddb7c9d0074623244dcb6599f318feacf2ace7755fcf654370ed1ae6c7d1c4",
 };
 
 function expectedSha256(op: ProveOp): string {
@@ -25,6 +27,8 @@ function expectedSha256(op: ProveOp): string {
     deposit: process.env.NEXT_PUBLIC_DEPOSIT_PK_SHA256,
     unshield: process.env.NEXT_PUBLIC_UNSHIELD_PK_SHA256,
     transfer: process.env.NEXT_PUBLIC_TRANSFER_PK_SHA256,
+    transfer2: process.env.NEXT_PUBLIC_TRANSFER_2_PK_SHA256,
+    transfer4: process.env.NEXT_PUBLIC_TRANSFER_4_PK_SHA256,
   }[op];
   return (override?.trim() || BUILT_IN_SHA256[op]).toLowerCase();
 }

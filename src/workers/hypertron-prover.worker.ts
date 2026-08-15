@@ -3,13 +3,19 @@
  * Messages: { id, op, wasmUrl, pkUrl, paramsJson }
  */
 
-import init, { deposit_proof, unshield_proof, transfer_proof } from "@hypertron/prover";
+import init, {
+  deposit_proof,
+  unshield_proof,
+  transfer_proof,
+  transfer_2_proof,
+  transfer_4_proof,
+} from "@hypertron/prover";
 
-import { assertProvingKeyDigest } from "@/lib/proving-key-digest";
+import { assertProvingKeyDigest, type ProveOp } from "@/lib/proving-key-digest";
 
 type WorkerReq = {
   id: string;
-  op: "deposit" | "unshield" | "transfer";
+  op: ProveOp;
   wasmUrl: string;
   pkUrl: string;
   paramsJson: string;
@@ -46,6 +52,10 @@ function runProof(op: WorkerReq["op"], pk: Uint8Array, params: string): string {
       return unshield_proof(pk, params);
     case "transfer":
       return transfer_proof(pk, params);
+    case "transfer2":
+      return transfer_2_proof(pk, params);
+    case "transfer4":
+      return transfer_4_proof(pk, params);
   }
 }
 

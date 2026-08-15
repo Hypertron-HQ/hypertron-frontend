@@ -77,7 +77,8 @@ async function proveOnMainThread(
   paramsJson: string,
 ): Promise<string> {
   const init = (await import("@hypertron/prover")).default;
-  const { deposit_proof, unshield_proof, transfer_proof } = await import("@hypertron/prover");
+  const { deposit_proof, unshield_proof, transfer_proof, transfer_2_proof, transfer_4_proof } =
+    await import("@hypertron/prover");
   await init({ module_or_path: getWasmUrl() });
   const res = await fetch(pkUrl);
   if (!res.ok) throw new Error(`Proving key not found (${pkUrl}).`);
@@ -92,6 +93,10 @@ async function proveOnMainThread(
       return unshield_proof(pk, paramsJson);
     case "transfer":
       return transfer_proof(pk, paramsJson);
+    case "transfer2":
+      return transfer_2_proof(pk, paramsJson);
+    case "transfer4":
+      return transfer_4_proof(pk, paramsJson);
   }
 }
 
