@@ -1,54 +1,76 @@
-const capabilities = [
+import { ArrowRight } from "lucide-react";
+import { ScrollFade } from "./reveal";
+
+const callouts = [
   {
-    title: "Onboarding flows",
-    copy: "Stand up counterparties and teams with workflows that feed directly into settlement.",
+    title: "Onboarding that settles",
+    copy: "Stand up counterparties and teams with workflows that feed directly into the same rail.",
   },
   {
     title: "Compliance in the loop",
-    copy: "Keep checks and approvals inside the same rail — not a side tool someone forgets.",
-  },
-  {
-    title: "Private settlement",
-    copy: "Move capital on Stellar with a privacy pool that stays programmable and defensible.",
-  },
-  {
-    title: "One operations layer",
-    copy: "Replace fragmented dashboards with a single surface for payments and B2B ops.",
+    copy: "Keep checks and approvals inside execution — not a side tool someone forgets.",
   },
 ] as const;
 
 export function LandingProduct() {
   return (
-    <section id="product" className="relative border-t border-line">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
-        <div className="max-w-md">
-          <p className="text-xs font-medium tracking-[0.18em] text-yellow uppercase">
-            The product
-          </p>
-          <h2 className="mt-4 font-display text-3xl tracking-tight text-fog sm:text-4xl">
-            B2B operations on Stellar, with{" "}
-            <em className="font-serif font-normal italic">privacy</em> you can
-            program.
-          </h2>
-          <p className="mt-4 text-base leading-relaxed text-mist">
-            Hypertron unifies onboarding, compliance, and settlement so execution
-            stays one pipeline — not a pile of tools.
-          </p>
-        </div>
+    <section id="product" className="landing-paper relative">
+      <div className="landing-paper-grid pointer-events-none absolute inset-0 opacity-90" />
 
-        <ul className="divide-y divide-line border-y border-line">
-          {capabilities.map((item) => (
-            <li
-              key={item.title}
-              className="grid gap-2 py-6 sm:grid-cols-[11rem_1fr] sm:gap-8"
+      <div className="relative mx-auto grid w-full max-w-[1440px] gap-12 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,0.82fr)] lg:items-end lg:gap-10">
+        <ScrollFade className="max-w-md">
+          <span
+            aria-hidden
+            className="mb-6 block size-2 bg-blue"
+          />
+          <h2 className="font-display text-[clamp(2.4rem,5vw,4.4rem)] leading-[0.94] font-medium tracking-[-0.04em] text-[#1c2433]">
+            Privacy you
+            <br />
+            can operate.
+          </h2>
+          <p className="mt-16 max-w-sm text-sm leading-relaxed text-[#5c6778]">
+            By combining onboarding, approvals, and a privacy pool on Stellar,
+            Hypertron sets a single standard for how B2B payments move — and
+            stay private as volume grows.
+          </p>
+        </ScrollFade>
+
+        <ScrollFade from={0.92} to={0.5} lag={0.12}>
+          <div className="landing-rail-card relative overflow-hidden rounded-sm bg-[#070b14] px-6 pt-7 pb-5 text-white">
+            <p className="text-[10px] tracking-[0.2em] text-white/45 uppercase">
+              Settlement rail
+            </p>
+            <p className="mt-8 font-display text-3xl tracking-tight sm:text-4xl">
+              Private pool
+            </p>
+            <p className="mt-3 text-sm text-white/55">
+              Programmable notes · USDC · XLM
+            </p>
+            <div aria-hidden className="landing-rail-pulse mt-10 h-24" />
+            <a
+              href="/developers"
+              className="mt-4 flex h-12 items-center justify-between border-t border-white/10 text-[11px] font-semibold tracking-[0.16em] text-white/80 uppercase transition hover:text-white"
             >
-              <h3 className="text-sm font-medium tracking-tight text-fog">
-                {item.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-mist">{item.copy}</p>
-            </li>
+              More in the platform
+              <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </ScrollFade>
+
+        <div className="grid gap-12">
+          {callouts.map((item, index) => (
+            <ScrollFade key={item.title} from={0.94} to={0.55} lag={0.18 + index * 0.1}>
+              <article className="border-t border-[#d5dce6] pt-5">
+                <h3 className="text-lg font-medium tracking-tight text-[#1c2433]">
+                  {item.title}
+                </h3>
+                <p className="mt-3 max-w-xs text-sm leading-relaxed text-[#5c6778]">
+                  {item.copy}
+                </p>
+              </article>
+            </ScrollFade>
           ))}
-        </ul>
+        </div>
       </div>
     </section>
   );
