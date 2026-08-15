@@ -32,7 +32,7 @@ export function getSorobanRpcUrl(): string {
 export function getPaymentPoolAddress(): string {
   return (
     process.env.NEXT_PUBLIC_PAYMENT_POOL_ADDRESS?.trim() ||
-    "CBNJY2ULVHOSHCTA4ZBMCU7AEVZHK4J5D3UEWIRSUYTIAQXZNTYQAMJQ"
+    "CCXVZOJB67J7ZBQG2UTZCFJ3ZSAMDLSBB62B7KLZNNLO4WQDD3KX6BYP"
   );
 }
 
@@ -80,4 +80,23 @@ export function toBaseUnits(amount: string, decimals = STELLAR_DECIMALS): string
   const paddedFrac = fracPart.padEnd(decimals, "0");
   const combined = `${wholePart}${paddedFrac}`.replace(/^0+(?=\d)/, "");
   return combined || "0";
+}
+
+/**
+ * Convert integer base units (stroops / 7dp) to decimal display amount.
+ */
+export function fromBaseUnits(
+  baseUnits: string,
+  decimals = STELLAR_DECIMALS,
+): string {
+  const raw = baseUnits.replace(/^0+(?=\d)/, "") || "0";
+  if (raw.length <= decimals) {
+    const padded = raw.padStart(decimals + 1, "0");
+    const whole = padded.slice(0, padded.length - decimals);
+    const frac = padded.slice(padded.length - decimals).replace(/0+$/, "");
+    return frac ? `${whole}.${frac}` : whole;
+  }
+  const whole = raw.slice(0, raw.length - decimals);
+  const frac = raw.slice(raw.length - decimals).replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : whole;
 }

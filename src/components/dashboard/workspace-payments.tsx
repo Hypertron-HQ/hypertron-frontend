@@ -16,6 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaymentLinksTable } from "@/components/dashboard/payment-links-table";
+import type { WalletSession } from "@/lib/auth";
+import {
+  getBusinessProfile,
+  updateBusinessProfile,
+  type BusinessProfile,
+} from "@/lib/business";
+import { putNote } from "@/lib/hypertron-note-store";
+import { buildDepositProof } from "@/lib/hypertron-prover";
+import {
+  deriveNoteSecrets,
+  deriveViewingKey,
+  deriveSpendKey,
+  randomSaltHex,
+} from "@/lib/hypertron-viewkey";
 import { createPaymentLink } from "@/lib/payment-links";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/mockdata";
@@ -75,7 +89,17 @@ function TokenLogo({
 const fieldCls =
   "h-11 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
 
-export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
+export function WorkspacePayments({
+  workspace,
+  session,
+  profile,
+  onProfileUpdated,
+}: {
+  workspace: Workspace;
+  session: WalletSession;
+  profile: BusinessProfile;
+  onProfileUpdated?: (profile: BusinessProfile) => void;
+}) {
   const [subTab, setSubTab] = useState<PaymentsSubTab>("collect");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<Currency>("XLM");
@@ -87,6 +111,7 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [workflowStage, setWorkflowStage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -114,6 +139,32 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
     }
   }
 
+  async function ensurePrivatePubs(): Promise<
+    { ok: true } | { ok: false; error: string }
+  > {
+    const current = await getBusinessProfile();
+    if (
+      current.ok &&
+      current.profile.viewPub?.trim() &&
+      current.profile.spendPub?.trim()
+    ) {
+      onProfileUpdated?.(current.profile);
+      return { ok: true };
+    }
+    setStatus("Sign in Freighter to enable private settlement…");
+    const viewDerived = await deriveViewingKey(session.walletAddress);
+    if (!viewDerived.ok) return { ok: false, error: viewDerived.error };
+    const spendDerived = await deriveSpendKey(session.walletAddress);
+    if (!spendDerived.ok) return { ok: false, error: spendDerived.error };
+    const updated = await updateBusinessProfile({
+      viewPub: viewDerived.keys.viewPub,
+      spendPub: spendDerived.keys.spendPub,
+    });
+    if (!updated.ok) return { ok: false, error: updated.error };
+    onProfileUpdated?.(updated.profile);
+    return { ok: true };
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     const normalized = amount.replace(/,/g, "").trim();
@@ -128,32 +179,97 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
 
     setLoading(true);
     setError(null);
+    setStatus(null);
 
-    const created = await createPaymentLink({
-      businessId: workspace.id,
-      amount: normalized,
-      currency,
-      purpose: description.trim() || undefined,
-      clientName: customer.trim() || undefined,
-      note: metadata.trim() || undefined,
-      privateSettlement,
-      expiryDays: expiry,
-      workflowStage: workflowStage.trim() || undefined,
-    });
+    try {
+      let shield:
+        | {
+            shieldSalt: string;
+            shieldCommitment: string;
+            shieldProof: string;
+            amountBaseUnits: string;
+          }
+        | undefined;
 
-    setLoading(false);
+      if (privateSettlement) {
+        if (!profile.viewPub?.trim() || !profile.spendPub?.trim()) {
+          const enabled = await ensurePrivatePubs();
+          if (!enabled.ok) {
+            setError(enabled.error);
+            return;
+          }
+        }
 
-    if (!created.ok) {
-      setError(created.error);
-      return;
+        setStatus("Building deposit proof…");
+        const spendKeys = await deriveSpendKey(session.walletAddress);
+        if (!spendKeys.ok) {
+          setError(spendKeys.error);
+          return;
+        }
+        const salt = randomSaltHex();
+        const { ownerPk, k } = await deriveNoteSecrets(
+          spendKeys.keys.spendSecret,
+          salt,
+        );
+        const proved = await buildDepositProof(normalized, { ownerPk, k });
+        if (!proved.ok) {
+          setError(proved.error);
+          return;
+        }
+        shield = {
+          shieldSalt: salt,
+          shieldCommitment: proved.result.commitment,
+          shieldProof: proved.result.proof,
+          amountBaseUnits: proved.result.amountBaseUnits,
+        };
+      }
+
+      setStatus("Creating payment link…");
+      const created = await createPaymentLink({
+        businessId: workspace.id,
+        amount: normalized,
+        currency,
+        purpose: description.trim() || undefined,
+        clientName: customer.trim() || undefined,
+        note: metadata.trim() || undefined,
+        privateSettlement,
+        expiryDays: expiry,
+        workflowStage: workflowStage.trim() || undefined,
+        shieldSalt: shield?.shieldSalt,
+        shieldCommitment: shield?.shieldCommitment,
+        shieldProof: shield?.shieldProof,
+      });
+
+      if (!created.ok) {
+        setError(created.error);
+        return;
+      }
+
+      if (shield) {
+        await putNote({
+          linkId: created.link.linkId,
+          businessId: workspace.id,
+          salt: shield.shieldSalt,
+          amount: normalized,
+          amountBaseUnits: shield.amountBaseUnits,
+          commitment: shield.shieldCommitment,
+          leafIndex: null,
+          paidAt: null,
+          spent: false,
+          createdAt: Date.now(),
+        });
+      }
+
+      setResult({
+        linkId: created.link.linkId,
+        url: created.link.url,
+        memo: created.link.memo,
+      });
+      setLinksRefreshKey((key) => key + 1);
+    } finally {
+      setLoading(false);
+      setStatus(null);
     }
-
-    setResult({
-      linkId: created.link.linkId,
-      url: created.link.url,
-      memo: created.link.memo,
-    });
-    setLinksRefreshKey((key) => key + 1);
   }
 
   async function copyLink() {
@@ -448,7 +564,9 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-slate-500">
                         {privateSettlement
-                          ? "Shield into Hypertron pool (XLM testnet) via ZK deposit."
+                          ? profile.viewPub?.trim() && profile.spendPub?.trim()
+                            ? "You pre-mint the note; the customer only funds it. Amount stays public on deposit."
+                            : "First use will ask Freighter for viewing + spend keys, then pre-mint the note."
                           : "Public Stellar payment straight to your Freighter wallet (G…) with memo attribution."}
                       </p>
                     </div>
@@ -540,13 +658,18 @@ export function WorkspacePayments({ workspace }: { workspace: Workspace }) {
                 ) : null}
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="h-11 min-w-[200px] bg-[#2563EB] px-6 text-white hover:bg-[#1d4ed8]"
-              >
-                {loading ? "Generating…" : "Generate Payment Link"}
-              </Button>
+              <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                {status ? (
+                  <p className="text-xs text-slate-500">{status}</p>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="h-11 min-w-[200px] bg-[#2563EB] px-6 text-white hover:bg-[#1d4ed8]"
+                >
+                  {loading ? "Generating…" : "Generate Payment Link"}
+                </Button>
+              </div>
             </div>
           </form>
         </div>

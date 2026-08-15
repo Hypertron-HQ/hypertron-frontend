@@ -6,10 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prover:sync": "node scripts/sync-prover.mjs"
   },
   "dependencies": {
-    "@hypertron/prover": "^0.1.0",
+    "@hypertron/prover": "file:vendor/hypertron-prover-wasm",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^14.6.1",
     "class-variance-authority": "^0.7.1",

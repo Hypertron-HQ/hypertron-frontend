@@ -4,6 +4,7 @@ import { BOOK_DEMO } from "./constants";
 
 const links = [
   { href: "#product", label: "Product" },
+  { href: "/developers", label: "Developers" },
   { href: "#how", label: "How it works" },
   { href: "#start", label: "Get started" },
 ] as const;

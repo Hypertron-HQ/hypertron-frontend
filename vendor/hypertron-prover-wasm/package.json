@@ -1,17 +1,24 @@
 {
-  "name": "hypertron-prover-wasm",
-  "type": "module",
-  "description": "WebAssembly bindings for the Hypertron off-chain prover (browser + Node)",
-  "version": "0.1.0",
+  "name": "@hypertron/prover",
+  "version": "0.1.1",
+  "description": "Browser WASM prover for the Hypertron shielded pool. Built from hypertron-contracts/prover-wasm via scripts/sync-prover.mjs — do not edit by hand.",
   "license": "Apache-2.0",
-  "files": [
-    "hypertron_prover_bg.wasm",
-    "hypertron_prover.js",
-    "hypertron_prover.d.ts"
-  ],
+  "type": "module",
   "main": "hypertron_prover.js",
+  "module": "hypertron_prover.js",
   "types": "hypertron_prover.d.ts",
+  "exports": {
+    ".": "./hypertron_prover.js",
+    "./web": "./hypertron_prover.js"
+  },
+  "files": [
+    "hypertron_prover.js",
+    "hypertron_prover.d.ts",
+    "hypertron_prover_bg.wasm",
+    "hypertron_prover_bg.wasm.d.ts",
+    "README.md"
+  ],
   "sideEffects": [
-    "./snippets/*"
+    "./hypertron_prover.js"
   ]
 }

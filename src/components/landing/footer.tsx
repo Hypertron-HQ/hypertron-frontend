@@ -26,6 +26,9 @@ export function LandingFooter() {
               <a href="#how" className="hover:text-fog">
                 How it works
               </a>
+              <a href="/developers" className="hover:text-fog">
+                Payments API
+              </a>
             </div>
             <div className="flex flex-col gap-2">
               <p className="text-xs tracking-[0.14em] text-haze uppercase">

@@ -2,6 +2,7 @@ import {
   Address,
   Contract,
   nativeToScVal,
+  hash,
   rpc,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
@@ -28,44 +29,37 @@ function hexToUint8(hex: string): Uint8Array {
   return out;
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
- * Build, simulate, Freighter-sign, and send a pool `deposit` invoke.
+ * recipient_field = sha256(xdr(ScVal::Address)) — the contract derives this
+ * public input itself via `Address::to_xdr`, which serializes the whole ScVal.
+ * Hashing the bare ScAddress instead drops the 4-byte discriminant and the
+ * proof fails to verify.
  */
-export async function submitPoolDeposit(input: {
-  fromAddress: string;
-  amountBaseUnits: string;
-  commitmentHex: string;
-  proofHex: string;
-}): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+export function recipientFieldHex(stellarAddress: string): string {
+  const addr = Address.fromString(stellarAddress);
+  const xdrBytes = addr.toScVal().toXDR("raw");
+  const digest = hash(xdrBytes);
+  return `0x${bytesToHex(digest instanceof Uint8Array ? digest : new Uint8Array(digest))}`;
+}
+
+async function signAndSend(
+  fromAddress: string,
+  buildOp: (contract: Contract) => ReturnType<Contract["call"]>,
+): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
   try {
     const server = new rpc.Server(getSorobanRpcUrl(), { allowHttp: true });
-    const account = await server.getAccount(input.fromAddress);
+    const account = await server.getAccount(fromAddress);
     const contract = new Contract(getPaymentPoolAddress());
-
-    const amount = BigInt(input.amountBaseUnits);
-    if (amount <= BigInt(0)) {
-      return { ok: false, error: "Amount must be greater than zero." };
-    }
-
-    const commitment = hexToUint8(input.commitmentHex);
-    const proof = hexToUint8(input.proofHex);
-    if (commitment.length !== 32) {
-      return { ok: false, error: "Commitment must be 32 bytes." };
-    }
-
-    const op = contract.call(
-      "deposit",
-      new Address(input.fromAddress).toScVal(),
-      nativeToScVal(amount, { type: "i128" }),
-      nativeToScVal(commitment, { type: "bytes" }),
-      nativeToScVal(proof, { type: "bytes" }),
-    );
 
     let tx = new TransactionBuilder(account, {
       fee: "100000",
       networkPassphrase: getNetworkPassphrase(),
     })
-      .addOperation(op)
+      .addOperation(buildOp(contract))
       .setTimeout(180)
       .build();
 
@@ -84,7 +78,7 @@ export async function submitPoolDeposit(input: {
 
     const signed = await signTransaction(tx.toXDR(), {
       networkPassphrase: getNetworkPassphrase(),
-      address: input.fromAddress,
+      address: fromAddress,
     });
 
     if (signed?.error || !signed?.signedTxXdr) {
@@ -104,22 +98,172 @@ export async function submitPoolDeposit(input: {
       return { ok: false, error: "Soroban submit failed." };
     }
 
-    const hash = sent.hash;
+    const txHash = sent.hash;
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1500));
-      const got = await server.getTransaction(hash);
+      const got = await server.getTransaction(txHash);
       if (got.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-        return { ok: true, hash };
+        return { ok: true, hash: txHash };
       }
       if (got.status === rpc.Api.GetTransactionStatus.FAILED) {
-        return { ok: false, error: "Deposit transaction failed on-chain." };
+        return { ok: false, error: "Transaction failed on-chain." };
       }
     }
 
-    return { ok: true, hash };
+    return { ok: true, hash: txHash };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Could not submit pool deposit.";
+      error instanceof Error ? error.message : "Could not submit transaction.";
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Build, simulate, Freighter-sign, and send a pool `deposit` invoke.
+ */
+export async function submitPoolDeposit(input: {
+  fromAddress: string;
+  amountBaseUnits: string;
+  commitmentHex: string;
+  proofHex: string;
+}): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+  const amount = BigInt(input.amountBaseUnits);
+  if (amount <= BigInt(0)) {
+    return { ok: false, error: "Amount must be greater than zero." };
+  }
+
+  const commitment = hexToUint8(input.commitmentHex);
+  const proof = hexToUint8(input.proofHex);
+  if (commitment.length !== 32) {
+    return { ok: false, error: "Commitment must be 32 bytes." };
+  }
+
+  return signAndSend(input.fromAddress, (contract) =>
+    contract.call(
+      "deposit",
+      new Address(input.fromAddress).toScVal(),
+      nativeToScVal(amount, { type: "i128" }),
+      nativeToScVal(commitment, { type: "bytes" }),
+      nativeToScVal(proof, { type: "bytes" }),
+    ),
+  );
+}
+
+export type PrivacyLevelClaim = {
+  sender: boolean;
+  receiver: boolean;
+  amount: boolean;
+  timing: boolean;
+  linkability: boolean;
+};
+
+/** Honest unshield claim — amount is public on exit. */
+export const UNSHIELD_PRIVACY_CLAIM: PrivacyLevelClaim = {
+  sender: true,
+  receiver: false,
+  amount: false,
+  timing: false,
+  linkability: true,
+};
+
+/**
+ * A Soroban `#[contracttype]` struct is a map keyed by Symbol. Without this
+ * spec the SDK encodes the field names as String and the host traps in
+ * `map_unpack_to_linear_memory` with `Error(Value, UnexpectedType)`.
+ */
+function privacyLevelToScVal(claim: PrivacyLevelClaim) {
+  return nativeToScVal(claim, {
+    type: {
+      sender: ["symbol", "bool"],
+      receiver: ["symbol", "bool"],
+      amount: ["symbol", "bool"],
+      timing: ["symbol", "bool"],
+      linkability: ["symbol", "bool"],
+    },
+  });
+}
+
+/**
+ * Permissionless unshield: proof binds recipient + amount.
+ */
+export async function submitPoolUnshield(input: {
+  fromAddress: string;
+  proofHex: string;
+  rootHex: string;
+  nullifierHex: string;
+  recipientAddress: string;
+  amountBaseUnits: string;
+  changeCommitmentHex: string;
+  claim?: PrivacyLevelClaim;
+}): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+  const amount = BigInt(input.amountBaseUnits);
+  if (amount <= BigInt(0)) {
+    return { ok: false, error: "Amount must be greater than zero." };
+  }
+
+  const proof = hexToUint8(input.proofHex);
+  const root = hexToUint8(input.rootHex);
+  const nullifier = hexToUint8(input.nullifierHex);
+  const changeCm = hexToUint8(input.changeCommitmentHex);
+  if (root.length !== 32 || nullifier.length !== 32 || changeCm.length !== 32) {
+    return { ok: false, error: "Root, nullifier, and change commitment must be 32 bytes." };
+  }
+
+  const claim = input.claim ?? UNSHIELD_PRIVACY_CLAIM;
+
+  return signAndSend(input.fromAddress, (contract) =>
+    contract.call(
+      "unshield",
+      nativeToScVal(proof, { type: "bytes" }),
+      nativeToScVal(root, { type: "bytes" }),
+      nativeToScVal(nullifier, { type: "bytes" }),
+      new Address(input.recipientAddress).toScVal(),
+      nativeToScVal(amount, { type: "i128" }),
+      nativeToScVal(changeCm, { type: "bytes" }),
+      privacyLevelToScVal(claim),
+    ),
+  );
+}
+
+/**
+ * Private transfer: spend one note, create two new notes (recipient + change).
+ * Amount is NOT visible on-chain.
+ */
+export async function submitPoolTransfer(input: {
+  fromAddress: string;
+  proofHex: string;
+  rootHex: string;
+  nullifierHex: string;
+  outCommitment1Hex: string;
+  outCommitment2Hex: string;
+  note1BlobHex: string;
+  note2BlobHex: string;
+}): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+  const proof = hexToUint8(input.proofHex);
+  const root = hexToUint8(input.rootHex);
+  const nullifier = hexToUint8(input.nullifierHex);
+  const outCm1 = hexToUint8(input.outCommitment1Hex);
+  const outCm2 = hexToUint8(input.outCommitment2Hex);
+  const note1 = hexToUint8(input.note1BlobHex);
+  const note2 = hexToUint8(input.note2BlobHex);
+
+  if (root.length !== 32 || nullifier.length !== 32) {
+    return { ok: false, error: "Root and nullifier must be 32 bytes." };
+  }
+  if (outCm1.length !== 32 || outCm2.length !== 32) {
+    return { ok: false, error: "Output commitments must be 32 bytes." };
+  }
+
+  return signAndSend(input.fromAddress, (contract) =>
+    contract.call(
+      "transfer",
+      nativeToScVal(proof, { type: "bytes" }),
+      nativeToScVal(root, { type: "bytes" }),
+      nativeToScVal(nullifier, { type: "bytes" }),
+      nativeToScVal(outCm1, { type: "bytes" }),
+      nativeToScVal(outCm2, { type: "bytes" }),
+      nativeToScVal(note1, { type: "bytes" }),
+      nativeToScVal(note2, { type: "bytes" }),
+    ),
+  );
 }

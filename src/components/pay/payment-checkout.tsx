@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   CheckCheck,
   Copy,
@@ -12,10 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { FREIGHTER_INSTALL_URL } from "@/lib/freighter-connect";
 import { connectFreighterWallet, signAndSubmitXdr } from "@/lib/freighter-tx";
-import { submitPoolDeposit } from "@/lib/hypertron-pool";
-import { buildDepositProof, storeNoteSecrets } from "@/lib/hypertron-prover";
+import { submitPoolDeposit, submitPoolTransfer } from "@/lib/hypertron-pool";
 import {
   getPublicPaymentLink,
+  claimPaymentLink,
   type PublicPaymentLink,
 } from "@/lib/payment-links";
 import { buildClassicPaymentXdr } from "@/lib/stellar-classic-pay";
@@ -23,8 +23,20 @@ import {
   getPaymentPoolAddress,
   getStellarExpertContractUrl,
   getStellarExpertTxUrl,
+  toBaseUnits,
+  fromBaseUnits,
 } from "@/lib/stellar-network";
 import { cn } from "@/lib/utils";
+import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
+import { buildTransferProof } from "@/lib/hypertron-prover";
+import { getPoolLeaves } from "@/lib/hypertron-indexer";
+import {
+  findSpendableNote,
+  putNoteV2,
+  markNoteSpent,
+  type StoredNoteV2,
+} from "@/lib/hypertron-note-store-v2";
+import { fullScan } from "@/lib/hypertron-note-scan";
 
 type Props = { linkId: string };
 
@@ -38,6 +50,12 @@ export function PaymentCheckout({ linkId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [viewSecret, setViewSecret] = useState<string | null>(null);
+  const [viewPub, setViewPub] = useState<string | null>(null);
+  const [spendSecret, setSpendSecret] = useState<string | null>(null);
+  const [spendPub, setSpendPub] = useState<string | null>(null);
+  const [spendableNote, setSpendableNote] = useState<StoredNoteV2 | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,14 +91,71 @@ export function PaymentCheckout({ linkId }: Props) {
     return () => window.clearInterval(id);
   }, [link, linkId, txHash]);
 
+  const checkForSpendableNote = useCallback(
+    async (
+      walletAddr: string,
+      secret: string,
+      spendSk: string,
+      amountNeeded: string,
+    ) => {
+      setScanning(true);
+      try {
+        await fullScan(walletAddr, secret, spendSk);
+        const note = await findSpendableNote(walletAddr, amountNeeded);
+        setSpendableNote(note);
+      } finally {
+        setScanning(false);
+      }
+    },
+    [],
+  );
+
   async function handleConnect() {
     setError(null);
-    const result = await connectFreighterWallet();
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    setBusy(true);
+    setStatus("Connecting wallet…");
+
+    try {
+      const result = await connectFreighterWallet();
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setWallet(result.address);
+
+      if (link?.privateSettlement) {
+        setStatus("Deriving viewing key…");
+        const vkResult = await deriveViewingKey(result.address);
+        if (!vkResult.ok) {
+          setError(vkResult.error);
+          return;
+        }
+        setViewSecret(vkResult.keys.viewSecret);
+        setViewPub(vkResult.keys.viewPub);
+
+        setStatus("Deriving spend key…");
+        const skResult = await deriveSpendKey(result.address);
+        if (!skResult.ok) {
+          setError(skResult.error);
+          return;
+        }
+        setSpendSecret(skResult.keys.spendSecret);
+        setSpendPub(skResult.keys.spendPub);
+
+        if (link.amount) {
+          setStatus("Checking shielded balance…");
+          await checkForSpendableNote(
+            result.address,
+            vkResult.keys.viewSecret,
+            skResult.keys.spendSecret,
+            toBaseUnits(link.amount),
+          );
+        }
+      }
+    } finally {
+      setBusy(false);
+      setStatus(null);
     }
-    setWallet(result.address);
   }
 
   async function handlePay() {
@@ -101,34 +176,20 @@ export function PaymentCheckout({ linkId }: Props) {
           setBusy(false);
           return;
         }
-        setStatus("Building ZK deposit proof…");
-        const proved = await buildDepositProof(link.amount);
-        if (!proved.ok) {
-          setError(proved.error);
+
+        const amountBaseUnits = toBaseUnits(link.amount);
+
+        if (spendableNote && spendSecret && spendPub && viewPub && link.viewPub && link.spendPub) {
+          await handleTransferPay(amountBaseUnits);
+        } else if (link.shieldCommitment && link.shieldProof) {
+          await handleDepositPay(amountBaseUnits);
+        } else {
+          setError(
+            "No shielded balance and no merchant deposit proof. Top up your wallet or ask the merchant to recreate the link.",
+          );
           setBusy(false);
           return;
         }
-        storeNoteSecrets(link.id, {
-          n: proved.result.n,
-          k: proved.result.k,
-          amountBaseUnits: proved.result.amountBaseUnits,
-          commitment: proved.result.commitment,
-        });
-        setStatus("Sign deposit in Freighter…");
-        const submitted = await submitPoolDeposit({
-          fromAddress: wallet,
-          amountBaseUnits: proved.result.amountBaseUnits,
-          commitmentHex: proved.result.commitment,
-          proofHex: proved.result.proof,
-        });
-        if (!submitted.ok) {
-          setError(submitted.error);
-          setBusy(false);
-          setStatus(null);
-          return;
-        }
-        setTxHash(submitted.hash);
-        setStatus("Deposit submitted. Note secrets saved in this browser.");
       } else {
         setStatus("Building payment…");
         const built = await buildClassicPaymentXdr({
@@ -158,6 +219,139 @@ export function PaymentCheckout({ linkId }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleDepositPay(amountBaseUnits: string) {
+    if (!link || !wallet || !link.shieldCommitment || !link.shieldProof) return;
+
+    setStatus("Sign deposit in Freighter…");
+    const submitted = await submitPoolDeposit({
+      fromAddress: wallet,
+      amountBaseUnits,
+      commitmentHex: link.shieldCommitment,
+      proofHex: link.shieldProof,
+    });
+    if (!submitted.ok) {
+      setError(submitted.error);
+      setStatus(null);
+      return;
+    }
+    setTxHash(submitted.hash);
+    setStatus("Deposit submitted. The merchant owns this note.");
+  }
+
+  async function handleTransferPay(amountBaseUnits: string) {
+    if (
+      !link ||
+      !wallet ||
+      !spendableNote ||
+      !spendSecret ||
+      !spendPub ||
+      !viewPub ||
+      !link.viewPub ||
+      !link.spendPub
+    ) {
+      return;
+    }
+
+    setStatus("Fetching pool leaves…");
+    const leavesRes = await getPoolLeaves();
+    if (!leavesRes.ok) {
+      setError(leavesRes.error);
+      setStatus(null);
+      return;
+    }
+
+    const leafIndex = spendableNote.leafIndex;
+    if (leafIndex == null) {
+      setError("Note is not yet confirmed on-chain. Try again shortly.");
+      setStatus(null);
+      return;
+    }
+
+    const inputV = BigInt(spendableNote.amountBaseUnits);
+    const payV = BigInt(amountBaseUnits);
+    const changeV = inputV - payV;
+
+    if (changeV < BigInt(0)) {
+      setError("Insufficient note balance.");
+      setStatus(null);
+      return;
+    }
+
+    setStatus("Building transfer proof (10-15s)…");
+    const proofResult = await buildTransferProof({
+      spendSk: spendSecret,
+      k: spendableNote.k,
+      v: spendableNote.amountBaseUnits,
+      leafIndex,
+      leaves: leavesRes.data.leaves,
+      out1OwnerPk: link.spendPub,
+      out1V: amountBaseUnits,
+      out2OwnerPk: spendPub,
+      out2V: changeV.toString(),
+      recipientViewPub: link.viewPub,
+      selfViewPub: viewPub,
+    });
+
+    if (!proofResult.ok) {
+      setError(proofResult.error);
+      setStatus(null);
+      return;
+    }
+
+    const { result } = proofResult;
+
+    setStatus("Sign transfer in Freighter…");
+    const submitted = await submitPoolTransfer({
+      fromAddress: wallet,
+      proofHex: result.proof,
+      rootHex: result.root,
+      nullifierHex: result.nullifier,
+      outCommitment1Hex: result.outCm1,
+      outCommitment2Hex: result.outCm2,
+      note1BlobHex: result.recipientBlob,
+      note2BlobHex: result.changeBlob,
+    });
+
+    if (!submitted.ok) {
+      setError(submitted.error);
+      setStatus(null);
+      return;
+    }
+
+    await markNoteSpent(spendableNote.commitment);
+
+    if (changeV > BigInt(0)) {
+      const changeNote: StoredNoteV2 = {
+        commitment: result.outCm2,
+        ownerWallet: wallet,
+        ownerPk: result.out2.ownerPk,
+        k: result.out2.k,
+        amount: fromBaseUnits(changeV.toString()),
+        amountBaseUnits: changeV.toString(),
+        leafIndex: null,
+        spent: false,
+        origin: "change",
+        createdAt: Date.now(),
+      };
+      await putNoteV2(changeNote);
+    }
+
+    setTxHash(submitted.hash);
+    setSpendableNote(null);
+    setStatus("Private transfer submitted. Claiming link…");
+
+    const claimed = await claimPaymentLink(
+      link.id,
+      submitted.hash,
+      result.outCm1,
+    );
+    if (!claimed.ok) {
+      console.warn("Claim failed:", claimed.error);
+    }
+
+    setStatus("Private transfer complete. Amount is hidden on-chain.");
   }
 
   async function copyHash() {
@@ -221,7 +415,9 @@ export function PaymentCheckout({ linkId }: Props) {
         {link.privateSettlement ? (
           <>
             <Shield className="size-3.5" />
-            Private settlement · pool deposit
+            {spendableNote
+              ? "Private transfer · amount hidden"
+              : "Private settlement · pool deposit"}
           </>
         ) : (
           <>
@@ -230,6 +426,52 @@ export function PaymentCheckout({ linkId }: Props) {
           </>
         )}
       </div>
+
+      {link.privateSettlement && wallet && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          {scanning ? (
+            <p className="flex items-center gap-2 text-slate-600">
+              <Loader2 className="size-3.5 animate-spin" />
+              Checking shielded balance…
+            </p>
+          ) : spendableNote ? (
+            <div>
+              <p className="font-medium text-emerald-700">
+                Using shielded balance
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Paying from note: {fromBaseUnits(spendableNote.amountBaseUnits)}{" "}
+                XLM (amount will be hidden)
+              </p>
+            </div>
+          ) : link.shieldCommitment && link.shieldProof ? (
+            <div>
+              <p className="font-medium text-amber-700">
+                No shielded balance — using deposit
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Amount will be visible on-chain.{" "}
+                <a href="/wallet" className="underline">
+                  Top up first
+                </a>{" "}
+                for hidden amounts.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="font-medium text-red-700">
+                No shielded balance
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                <a href="/wallet" className="underline">
+                  Top up your wallet
+                </a>{" "}
+                to pay this link privately.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <dl className="mt-6 space-y-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm">
         <Row
@@ -278,7 +520,14 @@ export function PaymentCheckout({ linkId }: Props) {
               </p>
               <Button
                 type="button"
-                disabled={busy || !link.amount}
+                disabled={
+                  busy ||
+                  !link.amount ||
+                  scanning ||
+                  (link.privateSettlement &&
+                    !spendableNote &&
+                    (!link.shieldCommitment || !link.shieldProof))
+                }
                 className="h-11 w-full bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
                 onClick={handlePay}
               >
@@ -288,7 +537,11 @@ export function PaymentCheckout({ linkId }: Props) {
                     Working…
                   </span>
                 ) : link.privateSettlement ? (
-                  "Shield & pay"
+                  spendableNote ? (
+                    "Pay privately"
+                  ) : (
+                    "Shield & pay"
+                  )
                 ) : (
                   "Pay with Freighter"
                 )}

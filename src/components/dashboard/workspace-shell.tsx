@@ -5,10 +5,8 @@ import {
   useCallback,
   useEffect,
   useState,
-  type ReactNode,
 } from "react";
 import {
-  Code2,
   CreditCard,
   LayoutDashboard,
   Settings,
@@ -16,7 +14,6 @@ import {
 } from "lucide-react";
 import { DashboardChrome } from "@/components/dashboard/dashboard-chrome";
 import {
-  WorkspaceDevelopers,
   WorkspaceOverview,
   WorkspacePayments,
   WorkspaceSettingsPanel,
@@ -34,7 +31,6 @@ import type { Workspace } from "@/mockdata";
 const TAB_ICONS = {
   overview: LayoutDashboard,
   payments: CreditCard,
-  developers: Code2,
   treasury: Wallet,
   settings: Settings,
 } as const;
@@ -50,10 +46,6 @@ const TAB_META: Record<
   payments: {
     label: "Payments",
     searchPlaceholder: "Search payments",
-  },
-  developers: {
-    label: "Developer Access",
-    searchPlaceholder: "Search developers",
   },
   treasury: {
     label: "Treasury",
@@ -82,11 +74,19 @@ export function WorkspaceShell({
 }) {
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [ready, setReady] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState(profile);
 
   useEffect(() => {
-    setTab(readTabFromUrl());
-    setReady(true);
+    queueMicrotask(() => {
+      setTab(readTabFromUrl());
+      setReady(true);
+    });
   }, []);
+
+  // Keep local profile when parent remounts with a different business.
+  if (profile.businessId !== currentProfile.businessId) {
+    setCurrentProfile(profile);
+  }
 
   const selectTab = useCallback((next: string) => {
     if (!isWorkspaceTab(next)) return;
@@ -113,47 +113,38 @@ export function WorkspaceShell({
       breadcrumb={`${workspace.name} / ${meta.label}`}
       searchPlaceholder={meta.searchPlaceholder}
       identity={{
-        title: profile.name.trim() || workspace.name,
+        title: currentProfile.name.trim() || workspace.name,
         subtitle: session.walletAddress,
       }}
     >
       {!ready ? null : (
         <>
-          <TabPanel active={tab === "overview"}>
-            <WorkspaceOverview workspace={workspace} />
-          </TabPanel>
-          <TabPanel active={tab === "payments"}>
-            <WorkspacePayments workspace={workspace} />
-          </TabPanel>
-          <TabPanel active={tab === "developers"}>
-            <WorkspaceDevelopers />
-          </TabPanel>
-          <TabPanel active={tab === "treasury"}>
-            <WorkspaceTreasury workspace={workspace} />
-          </TabPanel>
-          <TabPanel active={tab === "settings"}>
-            <WorkspaceSettingsPanel workspace={workspace} />
-          </TabPanel>
+          {tab === "overview" ? <WorkspaceOverview workspace={workspace} /> : null}
+          {tab === "payments" ? (
+            <WorkspacePayments
+              workspace={workspace}
+              session={session}
+              profile={currentProfile}
+              onProfileUpdated={setCurrentProfile}
+            />
+          ) : null}
+          {tab === "treasury" ? (
+            <WorkspaceTreasury
+              workspace={workspace}
+              session={session}
+              profile={currentProfile}
+            />
+          ) : null}
+          {tab === "settings" ? (
+            <WorkspaceSettingsPanel
+              workspace={workspace}
+              session={session}
+              profile={currentProfile}
+              onProfileUpdated={setCurrentProfile}
+            />
+          ) : null}
         </>
       )}
     </DashboardChrome>
-  );
-}
-
-function TabPanel({
-  active,
-  children,
-}: {
-  active: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      hidden={!active}
-      className={active ? "block" : "hidden"}
-      aria-hidden={!active}
-    >
-      {children}
-    </div>
   );
 }

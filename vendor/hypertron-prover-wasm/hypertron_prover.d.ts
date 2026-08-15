@@ -2,14 +2,14 @@
 /* eslint-disable */
 
 /**
- * Note commitment `cm = Poseidon(Poseidon(n, k), v)` as `0x`-hex.
+ * Note commitment `cm = Poseidon(Poseidon(owner_pk, k), v)` as `0x`-hex.
  */
-export function commitment(n: string, k: string, v: string): string;
+export function commitment(owner_pk: string, k: string, v: string): string;
 
 /**
- * Decrypt / scan a note blob with a viewing secret. Returns `{ n, k, v }`, or
- * throws if the blob is not addressed to this key. Used by recipients (note
- * discovery) and auditors (compliance disclosure).
+ * Decrypt / scan a note blob with a viewing secret. Returns
+ * `{ owner_pk, n, k, v }`, where `n` is a backward-compatible alias for
+ * `owner_pk`, or throws if the blob is not addressed to this key.
  */
 export function decrypt_note_blob(view_secret: string, blob: string): string;
 
@@ -21,9 +21,10 @@ export function deposit_proof(pk: Uint8Array, params_json: string): string;
 
 /**
  * Encrypt a note to a recipient's viewing pubkey. Returns the on-chain blob
- * (`eph_pub || ciphertext`) as `0x`-hex.
+ * (`eph_pub || ciphertext`) as `0x`-hex. The plaintext is `owner_pk || k || v`;
+ * the spend key is never encrypted.
  */
-export function encrypt_note_blob(recipient_view: string, n: string, k: string, v: string): string;
+export function encrypt_note_blob(recipient_view: string, owner_pk: string, k: string, v: string): string;
 
 /**
  * Generate a viewing keypair. Pass a 32-byte hex `seed` for deterministic
@@ -32,9 +33,20 @@ export function encrypt_note_blob(recipient_view: string, n: string, k: string, 
 export function keygen(seed?: string | null): string;
 
 /**
- * Nullifier `nf = Poseidon(n, 0)` as `0x`-hex.
+ * Merkle root over an ordered JSON array of `0x` leaf commitments (DEPTH=20).
+ * Empty array → empty-tree root. Used by hypertron-indexer for root verification.
  */
-export function nullifier(n: string): string;
+export function merkle_root(leaves_json: string): string;
+
+/**
+ * Nullifier `nf = Poseidon(spend_sk, k)` as `0x`-hex.
+ */
+export function nullifier(spend_sk: string, k: string): string;
+
+/**
+ * Derive `owner_pk = Poseidon(spend_sk, 0)` as `0x`-hex.
+ */
+export function owner_pk(spend_sk: string): string;
 
 /**
  * Install a panic hook that surfaces Rust panics in the JS console. Safe to
@@ -63,7 +75,9 @@ export interface InitOutput {
     readonly deposit_proof: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly encrypt_note_blob: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
     readonly keygen: (a: number, b: number, c: number) => void;
-    readonly nullifier: (a: number, b: number, c: number) => void;
+    readonly merkle_root: (a: number, b: number, c: number) => void;
+    readonly nullifier: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly owner_pk: (a: number, b: number, c: number) => void;
     readonly start: () => void;
     readonly transfer_proof: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly unshield_proof: (a: number, b: number, c: number, d: number, e: number) => void;

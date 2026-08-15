@@ -11,6 +11,10 @@ export type BusinessProfile = {
   selectedTierName: string | null;
   selectedTierAt: string | null;
   receiveAddress: string | null;
+  /** Public viewing key for private settlement; secret never leaves the browser. */
+  viewPub: string | null;
+  /** Public spend key (owner_pk) for receiving private notes; spendSecret never leaves the browser. */
+  spendPub: string | null;
   complianceForm: unknown;
 };
 
@@ -36,7 +40,14 @@ export async function getBusinessProfile(): Promise<
         error: json.error ?? "Could not load business profile.",
       };
     }
-    return { ok: true, profile: json };
+    return {
+      ok: true,
+      profile: {
+        ...json,
+        viewPub: json.viewPub ?? null,
+        spendPub: json.spendPub ?? null,
+      },
+    };
   } catch {
     return { ok: false, error: "Could not reach the API." };
   }
@@ -46,6 +57,8 @@ export async function updateBusinessProfile(input: {
   name?: string;
   email?: string;
   businessNature?: string;
+  viewPub?: string | null;
+  spendPub?: string | null;
 }): Promise<
   { ok: true; profile: BusinessProfile } | { ok: false; error: string }
 > {
@@ -58,7 +71,14 @@ export async function updateBusinessProfile(input: {
     if (!res.ok || !json.businessId) {
       return { ok: false, error: json.error ?? "Could not update profile." };
     }
-    return { ok: true, profile: json };
+    return {
+      ok: true,
+      profile: {
+        ...json,
+        viewPub: json.viewPub ?? null,
+        spendPub: json.spendPub ?? null,
+      },
+    };
   } catch {
     return { ok: false, error: "Could not reach the API." };
   }
