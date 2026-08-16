@@ -32,6 +32,7 @@ export type PublicPaymentLink = {
   expiresAt: string | null;
   paidAt: string | null;
   paymentTxHash: string | null;
+  claimedAt: string | null;
   privateSettlement: boolean;
   shieldCommitment: string | null;
   shieldProof: string | null;
@@ -259,6 +260,7 @@ export async function getPublicPaymentLink(
       expiresAt?: string | null;
       paidAt?: string | null;
       paymentTxHash?: string | null;
+      claimedAt?: string | null;
       shieldCommitment?: string | null;
       shieldProof?: string | null;
       viewPub?: string | null;
@@ -298,6 +300,7 @@ export async function getPublicPaymentLink(
         expiresAt: json.expiresAt ?? null,
         paidAt: json.paidAt ?? null,
         paymentTxHash: json.paymentTxHash ?? null,
+        claimedAt: json.claimedAt ?? null,
         privateSettlement: parsePrivateSettlement(json.metadata),
         shieldCommitment: json.shieldCommitment ?? null,
         shieldProof: json.shieldProof ?? null,
