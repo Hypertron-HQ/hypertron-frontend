@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
 import { buildTransferProof, buildTransferNProof } from "@/lib/hypertron-prover";
-import { getPoolLeaves } from "@/lib/hypertron-indexer";
+import { getPoolLeaves, getPoolCommitments } from "@/lib/hypertron-indexer";
 import {
   listUnspentNotesV2,
   putNoteV2,
@@ -86,7 +86,7 @@ export function PaymentCheckout({ linkId }: Props) {
     const id = window.setInterval(() => {
       void (async () => {
         const result = await getPublicPaymentLink(linkId);
-        if (result.ok && result.link.paidAt) {
+        if (result.ok && (result.link.paidAt || result.link.claimedAt)) {
           setLink(result.link);
           if (result.link.paymentTxHash) setTxHash(result.link.paymentTxHash);
         }
@@ -239,6 +239,27 @@ export function PaymentCheckout({ linkId }: Props) {
   async function handleDepositPay(amountBaseUnits: string) {
     if (!link || !wallet || !link.shieldCommitment || !link.shieldProof) return;
 
+    const already = await getPoolCommitments([link.shieldCommitment]);
+    if (already.ok) {
+      const hit = already.commitments.find(
+        (c) =>
+          c.leaf.replace(/^0x/i, "").toLowerCase() ===
+            link.shieldCommitment!.replace(/^0x/i, "").toLowerCase() &&
+          (c.leafIndex != null || Boolean(c.txHash)),
+      );
+      if (hit) {
+        if (hit.txHash) {
+          await claimPaymentLink(link.id, hit.txHash, link.shieldCommitment);
+          setTxHash(hit.txHash);
+        }
+        setError(
+          "This privacy link was already paid. The invoice note is already in the pool. Generate a new Collect privacy link for another payer, or top up this wallet and Pay privately.",
+        );
+        setStatus(null);
+        return;
+      }
+    }
+
     setStatus("Sign deposit in Freighter…");
     const submitted = await submitPoolDeposit({
       fromAddress: wallet,
@@ -252,6 +273,14 @@ export function PaymentCheckout({ linkId }: Props) {
       return;
     }
     setTxHash(submitted.hash);
+    const claimed = await claimPaymentLink(
+      link.id,
+      submitted.hash,
+      link.shieldCommitment,
+    );
+    if (!claimed.ok) {
+      console.warn("Deposit claim failed:", claimed.error);
+    }
     setStatus("Deposit submitted. The merchant owns this note.");
   }
 
@@ -476,7 +505,7 @@ export function PaymentCheckout({ linkId }: Props) {
     );
   }
 
-  const paid = Boolean(link.paidAt);
+  const paid = Boolean(link.paidAt || link.claimedAt);
   const amountLabel = link.amount
     ? `${link.amount} ${link.currency}`
     : `Any amount · ${link.currency}`;

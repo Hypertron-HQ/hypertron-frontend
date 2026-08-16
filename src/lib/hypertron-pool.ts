@@ -46,6 +46,32 @@ export function recipientFieldHex(stellarAddress: string): string {
   return `0x${bytesToHex(digest instanceof Uint8Array ? digest : new Uint8Array(digest))}`;
 }
 
+/** Map on-chain HostError codes to something a payer can act on. */
+export function formatPoolHostError(raw: string): string {
+  if (/Error\(Contract, #4\)/.test(raw) && /insert/i.test(raw)) {
+    return (
+      "This privacy link’s note is already in the pool (duplicate leaf). " +
+      "A Collect privacy link can only be Shield & pay’d once — the first " +
+      "successful deposit owns that commitment. Generate a new privacy " +
+      "payment link for another payer, or top up the paying wallet and use " +
+      "Pay privately from shielded balance."
+    );
+  }
+  if (/Error\(Contract, #4\)/.test(raw)) {
+    return (
+      "The pool rejected this as a duplicate (nullifier or leaf already used). " +
+      "If you already paid this link, it succeeded. Otherwise generate a new link."
+    );
+  }
+  if (/Error\(Contract, #5\)/.test(raw)) {
+    return (
+      "The pool rejected the ZK proof. The proving keys in this app do not " +
+      "match the verifying key registered on this contract."
+    );
+  }
+  return raw;
+}
+
 async function signAndSend(
   fromAddress: string,
   buildOp: (contract: Contract) => ReturnType<Contract["call"]>,
@@ -67,7 +93,9 @@ async function signAndSend(
     if (rpc.Api.isSimulationError(simulated)) {
       return {
         ok: false,
-        error: simulated.error || "Soroban simulation failed.",
+        error: formatPoolHostError(
+          simulated.error || "Soroban simulation failed.",
+        ),
       };
     }
     if (!rpc.Api.isSimulationSuccess(simulated)) {
@@ -114,7 +142,7 @@ async function signAndSend(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not submit transaction.";
-    return { ok: false, error: message };
+    return { ok: false, error: formatPoolHostError(message) };
   }
 }
 
