@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import {
+  Code2,
   CreditCard,
   LayoutDashboard,
   Settings,
@@ -19,6 +20,7 @@ import {
   SandboxSettings,
   SandboxTreasury,
 } from "@/components/sandbox/sandbox-panels";
+import { WorkspaceDevelopers } from "@/components/dashboard/workspace-developers";
 import {
   WORKSPACE_TABS,
   isWorkspaceTab,
@@ -30,6 +32,7 @@ const TAB_ICONS = {
   overview: LayoutDashboard,
   payments: CreditCard,
   treasury: Wallet,
+  developers: Code2,
   settings: Settings,
 } as const;
 
@@ -48,6 +51,10 @@ const TAB_META: Record<
   treasury: {
     label: "Treasury",
     searchPlaceholder: "Search treasury",
+  },
+  developers: {
+    label: "Developers",
+    searchPlaceholder: "Search API keys",
   },
   settings: {
     label: "Settings",
@@ -120,6 +127,7 @@ export function SandboxShell() {
           ) : null}
           {tab === "payments" ? <SandboxPayments /> : null}
           {tab === "treasury" ? <SandboxTreasury /> : null}
+          {tab === "developers" ? <WorkspaceDevelopers /> : null}
           {tab === "settings" ? <SandboxSettings /> : null}
         </>
       )}
