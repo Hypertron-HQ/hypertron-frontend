@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  checkPaymentLinkStatus,
   getPaymentLinkStatus,
   listPaymentLinks,
+  parsePrivateSettlement,
   type PaymentLinkListItem,
   type PaymentLinkStatus,
 } from "@/lib/payment-links";
+import { getStellarExpertTxUrl } from "@/lib/stellar-network";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<
@@ -78,6 +81,29 @@ export function PaymentLinksTable({
       setLoading(false);
       return;
     }
+
+    // Classic (non-private) pending links: nudge Horizon reconcile on refresh so
+    // status does not wait solely on the backend 30s scheduler.
+    const pendingClassic = result.links.filter((link) => {
+      if (getPaymentLinkStatus(link) !== "pending") return false;
+      return !parsePrivateSettlement(link.metadata);
+    });
+
+    if (pendingClassic.length > 0) {
+      await Promise.allSettled(
+        pendingClassic
+          .slice(0, 12)
+          .map((link) => checkPaymentLinkStatus(link.id)),
+      );
+      const refreshed = await listPaymentLinks(businessId);
+      if (refreshed.ok) {
+        setError(null);
+        setLinks(refreshed.links);
+        setLoading(false);
+        return;
+      }
+    }
+
     setError(null);
     setLinks(result.links);
     setLoading(false);
@@ -179,6 +205,9 @@ export function PaymentLinksTable({
               {links.map((link) => {
                 const status = getPaymentLinkStatus(link);
                 const style = STATUS_STYLES[status];
+                const txHash =
+                  link.paymentTxHash?.trim() || link.claimTxHash?.trim() || null;
+                const explorerUrl = txHash ? getStellarExpertTxUrl(txHash) : null;
                 return (
                   <tr
                     key={link.id}
@@ -208,9 +237,9 @@ export function PaymentLinksTable({
                       >
                         {style.label}
                       </span>
-                      {status === "paid" && link.paidAt ? (
+                      {status === "paid" && (link.paidAt || link.claimedAt) ? (
                         <p className="mt-1 text-[11px] text-slate-400">
-                          {formatWhen(link.paidAt)}
+                          {formatWhen(link.paidAt || link.claimedAt)}
                         </p>
                       ) : null}
                     </td>
@@ -233,15 +262,25 @@ export function PaymentLinksTable({
                           )}
                           {copiedId === link.id ? "Copied" : "Copy"}
                         </Button>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        >
-                          Open
-                          <ExternalLink className="size-3.5" />
-                        </a>
+                        {explorerUrl ? (
+                          <a
+                            href={explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        ) : (
+                          <span
+                            title="Available after payment is confirmed"
+                            className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 text-xs font-medium text-slate-400"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

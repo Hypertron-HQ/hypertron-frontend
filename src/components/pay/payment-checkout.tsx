@@ -1,21 +1,41 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
+  BadgeCheck,
+  Building2,
+  Check,
   CheckCheck,
+  CheckCircle2,
   Copy,
   ExternalLink,
   Loader2,
+  Lock,
+  QrCode,
+  Share2,
   Shield,
+  ShieldCheck,
   Wallet,
+  Zap,
 } from "lucide-react";
+import { HypertronLogoMark } from "@/components/dashboard/hypertron-logo-mark";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { FREIGHTER_INSTALL_URL } from "@/lib/freighter-connect";
 import { connectFreighterWallet, signAndSubmitXdr } from "@/lib/freighter-tx";
-import { submitPoolDeposit, submitPoolTransfer, submitPoolTransferN } from "@/lib/hypertron-pool";
+import {
+  submitPoolDeposit,
+  submitPoolTransfer,
+  submitPoolTransferN,
+} from "@/lib/hypertron-pool";
 import {
   getPublicPaymentLink,
   claimPaymentLink,
+  checkPaymentLinkStatus,
   type PublicPaymentLink,
 } from "@/lib/payment-links";
 import { buildClassicPaymentXdr } from "@/lib/stellar-classic-pay";
@@ -23,6 +43,7 @@ import {
   getPaymentPoolAddress,
   getStellarExpertContractUrl,
   getStellarExpertTxUrl,
+  getStellarNetwork,
   toBaseUnits,
   fromBaseUnits,
 } from "@/lib/stellar-network";
@@ -40,6 +61,35 @@ import {
 import { fullScan } from "@/lib/hypertron-note-scan";
 
 type Props = { linkId: string };
+type PayTab = "wallet" | "qr" | "onramp";
+
+const BRAND_FEATURES = [
+  { icon: Zap, title: "Fast", desc: "Instant transfer on Stellar" },
+  { icon: Shield, title: "Secure", desc: "On Stellar Network" },
+  { icon: Lock, title: "Private", desc: "Opt-in private settlement" },
+] as const;
+
+function splitPaymentDescription(description: string) {
+  const trimmed = description.trim();
+  if (!trimmed) return { label: "Payment for", subject: "Your order" };
+  const prefix = "Payment for ";
+  if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return { label: "Payment for", subject: trimmed.slice(prefix.length) };
+  }
+  return { label: "Payment for", subject: trimmed };
+}
+
+function formatExpires(expiresAt: string | null): string {
+  if (!expiresAt) return "Link does not expire";
+  const d = new Date(expiresAt);
+  if (Number.isNaN(d.getTime())) return "Link does not expire";
+  return `Expires ${d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
 
 export function PaymentCheckout({ linkId }: Props) {
   const [link, setLink] = useState<PublicPaymentLink | null>(null);
@@ -50,7 +100,7 @@ export function PaymentCheckout({ linkId }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"hash" | "address" | "link" | null>(null);
   const [viewSecret, setViewSecret] = useState<string | null>(null);
   const [viewPub, setViewPub] = useState<string | null>(null);
   const [spendSecret, setSpendSecret] = useState<string | null>(null);
@@ -60,6 +110,22 @@ export function PaymentCheckout({ linkId }: Props) {
   );
   const [notePickError, setNotePickError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [payPageUrl, setPayPageUrl] = useState("");
+  const [activeTab, setActiveTab] = useState<PayTab>("wallet");
+  const [kycName, setKycName] = useState("");
+  const [kycEmail, setKycEmail] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
+
+  const kycComplete =
+    kycName.trim().length > 0 &&
+    kycEmail.trim().length > 0 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kycEmail.trim());
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setPayPageUrl(`${window.location.origin}/pay/${linkId}`);
+    }
+  }, [linkId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +141,12 @@ export function PaymentCheckout({ linkId }: Props) {
       if (result.link.paymentTxHash) {
         setTxHash(result.link.paymentTxHash);
       }
+      const methods = result.link.paymentMethods?.length
+        ? result.link.paymentMethods
+        : ["wallet", "qr"];
+      if (methods.includes("wallet")) setActiveTab("wallet");
+      else if (methods.includes("qr")) setActiveTab("qr");
+      else if (methods.includes("onramp")) setActiveTab("onramp");
     })();
     return () => {
       cancelled = true;
@@ -82,9 +154,21 @@ export function PaymentCheckout({ linkId }: Props) {
   }, [linkId]);
 
   useEffect(() => {
-    if (!link || link.paidAt || !txHash) return;
+    if (!link || link.paidAt || link.claimedAt || !txHash) return;
     const id = window.setInterval(() => {
       void (async () => {
+        // Classic links: ask backend to match Horizon by memo.
+        if (!link.privateSettlement) {
+          const status = await checkPaymentLinkStatus(linkId, txHash);
+          if (status.ok && status.status === "paid") {
+            const result = await getPublicPaymentLink(linkId);
+            if (result.ok) {
+              setLink(result.link);
+              if (result.link.paymentTxHash) setTxHash(result.link.paymentTxHash);
+            }
+            return;
+          }
+        }
         const result = await getPublicPaymentLink(linkId);
         if (result.ok && (result.link.paidAt || result.link.claimedAt)) {
           setLink(result.link);
@@ -157,13 +241,14 @@ export function PaymentCheckout({ linkId }: Props) {
         setSpendSecret(skResult.keys.spendSecret);
         setSpendPub(skResult.keys.spendPub);
 
-        if (link.amount) {
+        const payAmount = link.amount || customAmount.trim();
+        if (payAmount) {
           setStatus("Checking shielded balance…");
           await checkForSpendableNote(
             result.address,
             vkResult.keys.viewSecret,
             skResult.keys.spendSecret,
-            toBaseUnits(link.amount),
+            toBaseUnits(payAmount),
           );
         }
       }
@@ -175,8 +260,9 @@ export function PaymentCheckout({ linkId }: Props) {
 
   async function handlePay() {
     if (!link || !wallet) return;
-    if (!link.amount) {
-      setError("This link has no fixed amount.");
+    const payAmount = link.amount || customAmount.trim();
+    if (!payAmount) {
+      setError("Enter an amount to pay.");
       return;
     }
 
@@ -192,9 +278,16 @@ export function PaymentCheckout({ linkId }: Props) {
           return;
         }
 
-        const amountBaseUnits = toBaseUnits(link.amount);
+        const amountBaseUnits = toBaseUnits(payAmount);
 
-        if (spendableNotes && spendSecret && spendPub && viewPub && link.viewPub && link.spendPub) {
+        if (
+          spendableNotes &&
+          spendSecret &&
+          spendPub &&
+          viewPub &&
+          link.viewPub &&
+          link.spendPub
+        ) {
           await handleTransferPay(amountBaseUnits);
         } else if (link.shieldCommitment && link.shieldProof) {
           await handleDepositPay(amountBaseUnits);
@@ -210,7 +303,7 @@ export function PaymentCheckout({ linkId }: Props) {
         const built = await buildClassicPaymentXdr({
           sourceAddress: wallet,
           destinationAddress: link.destinationAddress,
-          amount: link.amount,
+          amount: payAmount,
           currency: link.currency,
           memo: link.memo,
         });
@@ -229,7 +322,18 @@ export function PaymentCheckout({ linkId }: Props) {
           return;
         }
         setTxHash(submitted.hash);
-        setStatus("Payment submitted. Awaiting confirmation…");
+        setStatus("Payment submitted. Confirming…");
+        const statusCheck = await checkPaymentLinkStatus(
+          link.id,
+          submitted.hash,
+        );
+        if (statusCheck.ok && statusCheck.status === "paid") {
+          const refreshed = await getPublicPaymentLink(link.id);
+          if (refreshed.ok) setLink(refreshed.link);
+          setStatus("Payment confirmed.");
+        } else {
+          setStatus("Payment submitted. Awaiting confirmation…");
+        }
       }
     } finally {
       setBusy(false);
@@ -362,9 +466,7 @@ export function PaymentCheckout({ linkId }: Props) {
     let changeBlob: string;
     let out2: { ownerPk: string; k: string; v: string };
     let nullifiers: string[];
-    let submit:
-      | { ok: true; hash: string }
-      | { ok: false; error: string };
+    let submit: { ok: true; hash: string } | { ok: false; error: string };
 
     if (arity === 1) {
       const note = spendableNotes[0];
@@ -472,256 +574,751 @@ export function PaymentCheckout({ linkId }: Props) {
     setStatus("Private transfer complete. Amount is hidden on-chain.");
   }
 
-  async function copyHash() {
-    if (!txHash) return;
+  async function copyText(text: string, kind: "hash" | "address" | "link") {
     try {
-      await navigator.clipboard.writeText(txHash);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      await navigator.clipboard.writeText(text);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1600);
     } catch {
       /* ignore */
     }
   }
 
+  const networkName = getStellarNetwork() === "public" ? "Mainnet" : "Testnet";
+  const networkLabel = `Recommended network · ${networkName}`;
+
   if (loadError) {
     return (
-      <Shell>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-          {expired ? "Link expired" : "Payment unavailable"}
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">{loadError}</p>
-      </Shell>
+      <CheckoutPageShell networkLabel={networkName}>
+        <div className="rounded-2xl border border-[#E7B66D]/40 bg-white px-6 py-10 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-[#0F1939]">
+            {expired ? "Link expired" : "Payment unavailable"}
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">{loadError}</p>
+        </div>
+      </CheckoutPageShell>
     );
   }
 
   if (!link) {
     return (
-      <Shell>
-        <p className="inline-flex items-center gap-2 text-sm text-slate-500">
-          <Loader2 className="size-4 animate-spin" />
-          Loading payment…
-        </p>
-      </Shell>
+      <CheckoutPageShell networkLabel={networkName}>
+        <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-[#E7B66D]/35 bg-white">
+          <p className="inline-flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="size-4 animate-spin text-[#4A63BE]" />
+            Loading payment…
+          </p>
+        </div>
+      </CheckoutPageShell>
     );
   }
 
   const paid = Boolean(link.paidAt || link.claimedAt);
-  const amountLabel = link.amount
-    ? `${link.amount} ${link.currency}`
-    : `Any amount · ${link.currency}`;
+  const isAnyAmount = !link.amount;
+  const displayAmount = isAnyAmount ? customAmount.trim() : link.amount!;
+  const amountLabel = displayAmount
+    ? `${displayAmount} ${link.currency}`
+    : `— ${link.currency}`;
+  const businessName = link.businessName?.trim() || "Hypertron";
+  const description = link.purpose?.trim() || "Payment";
+  const paymentDesc = splitPaymentDescription(description);
+  const enabledMethods = link.paymentMethods?.length
+    ? link.paymentMethods
+    : ["wallet", "qr"];
+  const tabs = (
+    [
+      { id: "wallet" as const, label: "Wallet", Icon: Wallet },
+      { id: "qr" as const, label: "QR Code", Icon: QrCode },
+      { id: "onramp" as const, label: "On-Ramp", Icon: Building2 },
+    ] as const
+  ).filter((t) => enabledMethods.includes(t.id));
+
+  const payDest = link.privateSettlement
+    ? getPaymentPoolAddress()
+    : link.destinationAddress;
+
+  const canPay =
+    Boolean(displayAmount) &&
+    !scanning &&
+    !(
+      link.privateSettlement &&
+      !spendableNotes &&
+      (!link.shieldCommitment || !link.shieldProof)
+    );
+
+  const payButtonLabel = !wallet
+    ? "Pay with Stellar Wallet"
+    : link.privateSettlement
+      ? spendableNotes
+        ? `Pay privately · ${amountLabel}`
+        : `Shield & pay · ${amountLabel}`
+      : `Pay ${amountLabel}`;
 
   return (
-    <Shell>
-      <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
-        {link.businessName?.trim() || "Hypertron"} · Checkout
-      </p>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
-        {amountLabel}
-      </h1>
-      {link.purpose ? (
-        <p className="mt-2 text-sm text-slate-500">{link.purpose}</p>
-      ) : null}
+    <CheckoutPageShell networkLabel={networkName}>
+      <div className="overflow-hidden rounded-2xl border border-[#E7B66D]/40 bg-white">
+        <div className="grid min-h-[620px] grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
+          {/* Brand panel */}
+          <aside className="relative flex min-h-[320px] flex-col justify-between overflow-hidden bg-gradient-to-b from-[#0F1939] via-[#121F46] to-[#1a2f6b] p-6 lg:min-h-0">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-50"
+              aria-hidden
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 18% 88%, rgba(231,182,109,0.18) 0%, transparent 48%), radial-gradient(circle at 82% 12%, rgba(74,99,190,0.28) 0%, transparent 45%)",
+              }}
+            />
+            <div className="relative space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#4A63BE] text-sm font-semibold text-white">
+                    {businessName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-white">
+                      {businessName}
+                    </span>
+                    <BadgeCheck className="size-4 shrink-0 text-[#E7B66D]" />
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                    paid
+                      ? "bg-emerald-500/20 text-emerald-200"
+                      : "bg-[#E7B66D]/20 text-[#E7B66D]",
+                  )}
+                >
+                  {paid ? "Paid" : "Unpaid"}
+                </span>
+              </div>
 
-      <div
-        className={cn(
-          "mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-          link.privateSettlement
-            ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
-            : "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
-        )}
-      >
-        {link.privateSettlement ? (
-          <>
-            <Shield className="size-3.5" />
-            {spendableNotes
-              ? "Private transfer · amount hidden"
-              : "Private settlement · pool deposit"}
-          </>
-        ) : (
-          <>
-            <Wallet className="size-3.5" />
-            Public Stellar payment
-          </>
-        )}
+              <div>
+                <p className="text-sm text-white/70">{paymentDesc.label}</p>
+                <p className="mt-0.5 text-lg font-semibold leading-snug text-white">
+                  {paymentDesc.subject}
+                </p>
+              </div>
+
+              <ul className="space-y-3">
+                {BRAND_FEATURES.map(({ icon: Icon, title, desc }) => (
+                  <li key={title} className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#4A63BE]/35 text-[#E7B66D]">
+                      <Icon className="size-3.5" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{title}</p>
+                      <p className="text-xs text-white/70">{desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="relative mt-6 flex items-center gap-2 text-xs text-white/75">
+              <Shield className="size-3.5 shrink-0 text-[#E7B66D]" />
+              Secured by Hypertron
+            </div>
+          </aside>
+
+          {/* Checkout panel */}
+          <div className="flex min-h-0 flex-col p-6 sm:p-7">
+            <div className="shrink-0">
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+                Amount to pay
+              </p>
+              {isAnyAmount ? (
+                <div className="mt-2">
+                  <Label
+                    htmlFor="pay-amount"
+                    className="text-xs font-medium text-slate-700"
+                  >
+                    Enter amount ({link.currency})
+                  </Label>
+                  <div className="mt-1.5 flex overflow-hidden rounded-xl border border-[#E7B66D]/40 focus-within:ring-2 focus-within:ring-[#4A63BE]/25">
+                    <Input
+                      id="pay-amount"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 10"
+                      value={customAmount}
+                      onChange={(e) => setCustomAmount(e.target.value.trim())}
+                      className="h-11 flex-1 rounded-none border-0 bg-white text-lg font-semibold text-[#0F1939] focus-visible:ring-0"
+                    />
+                    <span className="flex items-center border-l border-[#E7B66D]/30 bg-[#FBF7F0] px-3 text-sm font-medium text-slate-600">
+                      {link.currency}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1 text-3xl font-semibold tracking-tight text-[#0F1939]">
+                  {link.amount}{" "}
+                  <span className="text-xl font-medium text-slate-500">
+                    {link.currency}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {tabs.length > 0 ? (
+              <div className="mt-5 shrink-0 space-y-2.5">
+                <p className="text-sm font-medium text-slate-700">Pay with</p>
+                <div className="flex flex-wrap gap-2">
+                  {tabs.map(({ id, label, Icon }) => {
+                    const active = activeTab === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setActiveTab(id)}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "border-[#4A63BE] bg-[#EEF2FF] text-[#4A63BE]"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-[#E7B66D]/50",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-3 space-y-3 rounded-xl border border-[#E7B66D]/30 bg-[#FBF7F0]/60 px-3.5 py-3">
+              <p className="text-xs font-medium text-slate-700">
+                Your details (for receipt)
+              </p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="pay-kyc-name"
+                    className="text-[11px] text-slate-500"
+                  >
+                    Name
+                  </Label>
+                  <Input
+                    id="pay-kyc-name"
+                    value={kycName}
+                    onChange={(e) => setKycName(e.target.value)}
+                    placeholder="Your name"
+                    className="h-9 border-[#E7B66D]/35 bg-white text-sm text-slate-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="pay-kyc-email"
+                    className="text-[11px] text-slate-500"
+                  >
+                    Email
+                  </Label>
+                  <Input
+                    id="pay-kyc-email"
+                    type="email"
+                    value={kycEmail}
+                    onChange={(e) => setKycEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="h-9 border-[#E7B66D]/35 bg-white text-sm text-slate-900"
+                  />
+                </div>
+              </div>
+              {kycComplete ? (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                  <CheckCircle2 className="size-3.5" /> Ready to continue
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Required before paying or using the QR code.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-3 flex min-h-0 flex-1 flex-col">
+              {activeTab === "wallet" ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="mt-1 flex items-center justify-between gap-3 rounded-xl border border-[#E7B66D]/35 bg-[#FBF7F0]/50 px-3.5 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#4A63BE] text-[11px] font-bold text-white">
+                        {link.currency.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#0F1939]">
+                          {link.currency} on Stellar
+                        </p>
+                        <p className="text-xs text-slate-500">{networkLabel}</p>
+                      </div>
+                    </div>
+                    <Badge className="shrink-0 border-emerald-200 bg-emerald-50 text-[11px] text-emerald-700 hover:bg-emerald-50">
+                      Fast &amp; low fees
+                    </Badge>
+                  </div>
+
+                  {link.privateSettlement ? (
+                    <div className="mt-3 rounded-xl border border-[#E7B66D]/40 bg-[#FBF7F0] px-3.5 py-3 text-sm">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[#C9A46A] uppercase">
+                        <Shield className="size-3.5" />
+                        Private settlement
+                      </p>
+                      {!wallet ? (
+                        <p className="mt-1 text-xs text-slate-600">
+                          Connect Freighter to pay from shielded notes or via
+                          pool deposit.
+                        </p>
+                      ) : scanning ? (
+                        <p className="mt-1 flex items-center gap-2 text-xs text-slate-600">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Checking shielded balance…
+                        </p>
+                      ) : spendableNotes ? (
+                        <p className="mt-1 text-xs text-emerald-700">
+                          Paying from {spendableNotes.length} note
+                          {spendableNotes.length === 1 ? "" : "s"} (
+                          {fromBaseUnits(
+                            spendableNotes
+                              .reduce(
+                                (s, n) => s + BigInt(n.amountBaseUnits),
+                                BigInt(0),
+                              )
+                              .toString(),
+                          )}{" "}
+                          XLM) — amount stays hidden.
+                        </p>
+                      ) : notePickError ? (
+                        <p className="mt-1 text-xs text-amber-700">
+                          {notePickError}
+                        </p>
+                      ) : link.shieldCommitment && link.shieldProof ? (
+                        <p className="mt-1 text-xs text-amber-800">
+                          No shielded balance — using deposit (amount visible
+                          on-chain).{" "}
+                          <a href="/wallet" className="underline">
+                            Top up first
+                          </a>{" "}
+                          for hidden amounts.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-red-700">
+                          No shielded balance.{" "}
+                          <a href="/wallet" className="underline">
+                            Top up your wallet
+                          </a>{" "}
+                          to pay privately.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {paid ? (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                      <CheckCircle2 className="mx-auto size-7 text-emerald-600" />
+                      <p className="mt-1.5 text-sm font-semibold text-emerald-800">
+                        Payment received
+                      </p>
+                      {txHash || link.paymentTxHash ? (
+                        <ExplorerLinks
+                          txHash={(txHash || link.paymentTxHash)!}
+                          showContract={link.privateSettlement}
+                        />
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
+                      {wallet ? (
+                        <p className="mt-3 truncate font-mono text-[11px] text-slate-500">
+                          {wallet}
+                        </p>
+                      ) : null}
+                      <Button
+                        type="button"
+                        disabled={
+                          !kycComplete ||
+                          busy ||
+                          (wallet ? !canPay : false)
+                        }
+                        className="mt-3 h-11 w-full gap-2 rounded-xl bg-gradient-to-r from-[#121F46] to-[#4A63BE] text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+                        onClick={() =>
+                          void (wallet ? handlePay() : handleConnect())
+                        }
+                      >
+                        {busy ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            {status || "Working…"}
+                          </>
+                        ) : (
+                          <>
+                            <Wallet className="size-4" />
+                            {payButtonLabel}
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+
+                  {status && !busy ? (
+                    <p className="mt-2 text-sm text-slate-600">{status}</p>
+                  ) : null}
+                  {error ? (
+                    <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      <p>{error}</p>
+                      {error.toLowerCase().includes("install") ? (
+                        <a
+                          href={FREIGHTER_INSTALL_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-block font-medium text-[#4A63BE] underline"
+                        >
+                          Install Freighter
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {txHash && !paid ? (
+                    <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+                      <p className="text-sm font-medium text-emerald-800">
+                        Transaction submitted
+                      </p>
+                      <ExplorerLinks
+                        txHash={txHash}
+                        showContract={link.privateSettlement}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyText(txHash, "hash")}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-800"
+                      >
+                        {copied === "hash" ? (
+                          <CheckCheck className="size-3.5" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                        {copied === "hash" ? "Copied" : "Copy hash"}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <TrustFooter />
+                </div>
+              ) : activeTab === "qr" ? (
+                <QrPanel
+                  payPageUrl={payPageUrl}
+                  copyAddress={payDest}
+                  currency={link.currency}
+                  expiresAt={link.expiresAt}
+                  privateSettlement={link.privateSettlement}
+                  detailsComplete={kycComplete}
+                  copied={copied}
+                  onCopy={(text, kind) => void copyText(text, kind)}
+                />
+              ) : (
+                <OnRampPanel
+                  currency={link.currency}
+                  vaultName={
+                    businessName.endsWith("Vault")
+                      ? businessName
+                      : `${businessName} Vault`
+                  }
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </CheckoutPageShell>
+  );
+}
+
+function CheckoutPageShell({
+  children,
+  networkLabel,
+}: {
+  children: ReactNode;
+  networkLabel: string;
+}) {
+  return (
+    <main className="min-h-svh w-full bg-[radial-gradient(ellipse_at_top,_#FBF7F0_0%,_#F4F6FB_45%,_#EEF1F8_100%)] px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-3xl">
+        <header className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <HypertronLogoMark size={32} />
+            <div className="leading-tight">
+              <p className="text-sm font-semibold tracking-tight text-[#0F1939]">
+                Hypertron
+              </p>
+              <p className="text-[11px] text-slate-500">Secure checkout</p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#E7B66D]/45 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+            <span className="size-2 rounded-full bg-[#4A63BE]" />
+            Stellar · {networkLabel}
+          </span>
+        </header>
+
+        {children}
+
+        <footer className="mt-6 text-center text-[11px] text-slate-500">
+          By completing this payment, you agree to Hypertron&apos;s{" "}
+          <Link href="/terms" className="text-[#4A63BE] hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-[#4A63BE] hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+function TrustFooter() {
+  return (
+    <div className="mt-auto flex shrink-0 flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
+      <span className="inline-flex items-center gap-1.5">
+        <ShieldCheck className="size-3.5 text-[#C9A46A]" />
+        Private &amp; secure payments
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Shield className="size-3.5 text-[#C9A46A]" />
+        Opt-in privacy available
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Check className="size-3.5 text-[#C9A46A]" />
+        Proof of payment
+      </span>
+    </div>
+  );
+}
+
+function QrPanel({
+  payPageUrl,
+  copyAddress,
+  currency,
+  expiresAt,
+  privateSettlement,
+  detailsComplete,
+  copied,
+  onCopy,
+}: {
+  payPageUrl: string;
+  copyAddress: string;
+  currency: string;
+  expiresAt: string | null;
+  privateSettlement: boolean;
+  detailsComplete: boolean;
+  copied: "hash" | "address" | "link" | null;
+  onCopy: (text: string, kind: "address" | "link") => void;
+}) {
+  const qrSize = 148;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="rounded-xl border border-[#E7B66D]/40 bg-[#FBF7F0] px-3.5 py-2.5">
+        <p className="text-sm font-medium text-[#0F1939]">
+          {privateSettlement
+            ? "Private settlement enabled"
+            : "Public Stellar payment"}
+        </p>
+        <p className="mt-0.5 text-[11px] text-slate-500">
+          {privateSettlement
+            ? "Scan to open this checkout and pay via the Hypertron pool."
+            : "Scan with any wallet app, or copy the destination address."}
+        </p>
       </div>
 
-      {link.privateSettlement && wallet && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          {scanning ? (
-            <p className="flex items-center gap-2 text-slate-600">
-              <Loader2 className="size-3.5 animate-spin" />
-              Checking shielded balance…
-            </p>
-          ) : spendableNotes ? (
-            <div>
-              <p className="font-medium text-emerald-700">
-                Using shielded balance
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Paying from {spendableNotes.length} note
-                {spendableNotes.length === 1 ? "" : "s"}:{" "}
-                {fromBaseUnits(
-                  spendableNotes
-                    .reduce((s, n) => s + BigInt(n.amountBaseUnits), BigInt(0))
-                    .toString(),
-                )}{" "}
-                XLM (amount will be hidden)
-              </p>
-            </div>
-          ) : notePickError ? (
-            <div>
-              <p className="font-medium text-amber-700">Need another note</p>
-              <p className="mt-1 text-xs text-slate-500">{notePickError}</p>
-            </div>
-          ) : link.shieldCommitment && link.shieldProof ? (
-            <div>
-              <p className="font-medium text-amber-700">
-                No shielded balance — using deposit
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Amount will be visible on-chain.{" "}
-                <a href="/wallet" className="underline">
-                  Top up first
-                </a>{" "}
-                for hidden amounts.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <p className="font-medium text-red-700">
-                No shielded balance
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                <a href="/wallet" className="underline">
-                  Top up your wallet
-                </a>{" "}
-                to pay this link privately.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      <h3 className="mt-3 text-sm font-semibold text-[#0F1939]">
+        Scan with any wallet
+      </h3>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Use your wallet app to scan the QR code and complete the payment.
+      </p>
 
-      <dl className="mt-6 space-y-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm">
-        <Row
-          label="Destination"
-          value={
-            link.privateSettlement
-              ? getPaymentPoolAddress()
-              : link.destinationAddress
-          }
-          mono
-        />
-        {!link.privateSettlement ? (
-          <Row label="Memo" value={link.memo} mono />
-        ) : (
-          <Row
-            label="Pool"
-            value="hypertron-transfer · XLM testnet"
-          />
-        )}
-      </dl>
-
-      {paid ? (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-          <p className="text-sm font-semibold text-emerald-800">Paid</p>
-          {txHash || link.paymentTxHash ? (
-            <ExplorerLinks
-              txHash={(txHash || link.paymentTxHash)!}
-              showContract={link.privateSettlement}
-            />
-          ) : null}
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex shrink-0 justify-center sm:justify-start">
+          <div className="relative rounded-xl border border-[#E7B66D]/50 bg-white p-2.5">
+            <div
+              className={cn(!detailsComplete && "pointer-events-none select-none blur-md")}
+            >
+              {payPageUrl ? (
+                <div className="relative">
+                  <QRCodeSVG
+                    value={payPageUrl}
+                    size={qrSize}
+                    level="H"
+                    includeMargin={false}
+                    bgColor="#FFFFFF"
+                    fgColor="#0F1939"
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="flex size-8 items-center justify-center rounded-full border-[3px] border-white bg-[#4A63BE] text-[10px] font-bold text-white">
+                      H
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center justify-center bg-slate-100 text-xs text-slate-500"
+                  style={{ width: qrSize, height: qrSize }}
+                >
+                  Loading…
+                </div>
+              )}
+            </div>
+            {!detailsComplete ? (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80 px-3 text-center backdrop-blur-sm">
+                <p className="text-xs font-medium text-[#0F1939]">
+                  Enter your name and email above to unlock
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      ) : (
-        <div className="mt-6 space-y-3">
-          {!wallet ? (
+
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-[#E7B66D]/35 bg-white px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#4A63BE] text-[9px] font-bold text-white">
+                {currency.slice(0, 1)}
+              </div>
+              <p className="truncate text-xs font-medium text-[#0F1939]">
+                {currency} on Stellar
+              </p>
+            </div>
+            <Badge className="gap-0.5 border-emerald-200 bg-emerald-50 px-1.5 text-[10px] text-emerald-700 hover:bg-emerald-50">
+              <Check className="size-2.5" />
+              Verified
+            </Badge>
+          </div>
+
+          <p className="break-all font-mono text-[10px] leading-relaxed text-slate-500">
+            {copyAddress}
+          </p>
+
+          <div className="grid grid-cols-3 gap-1.5">
             <Button
               type="button"
-              className="h-11 w-full bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
-              onClick={handleConnect}
+              variant="outline"
+              size="sm"
+              disabled={!detailsComplete}
+              className="h-8 gap-1 border-[#E7B66D]/45 bg-white px-2 text-[11px] text-[#0F1939] hover:bg-[#FBF7F0]"
+              onClick={() => onCopy(copyAddress, "address")}
             >
-              Connect Freighter
+              <Copy className="size-3" />
+              {copied === "address" ? "Copied" : "Copy"}
             </Button>
-          ) : (
-            <>
-              <p className="truncate font-mono text-xs text-slate-500">
-                {wallet}
-              </p>
-              <Button
-                type="button"
-                disabled={
-                  busy ||
-                  !link.amount ||
-                  scanning ||
-                  (link.privateSettlement &&
-                    !spendableNotes &&
-                    (!link.shieldCommitment || !link.shieldProof))
-                }
-                className="h-11 w-full bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
-                onClick={handlePay}
-              >
-                {busy ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" />
-                    Working…
-                  </span>
-                ) : link.privateSettlement ? (
-                  spendableNotes ? (
-                    "Pay privately"
-                  ) : (
-                    "Shield & pay"
-                  )
-                ) : (
-                  "Pay with Freighter"
-                )}
-              </Button>
-            </>
-          )}
-
-          {status ? (
-            <p className="text-sm text-slate-600">{status}</p>
-          ) : null}
-          {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <p>{error}</p>
-              {error.toLowerCase().includes("install") ? (
-                <a
-                  href={FREIGHTER_INSTALL_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block font-medium text-[#2563EB] underline"
-                >
-                  Install Freighter
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-          {txHash ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-sm font-medium text-emerald-800">
-                Transaction submitted
-              </p>
-              <ExplorerLinks
-                txHash={txHash}
-                showContract={link.privateSettlement}
-              />
-              <button
-                type="button"
-                onClick={copyHash}
-                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-800"
-              >
-                {copied ? (
-                  <CheckCheck className="size-3.5" />
-                ) : (
-                  <Copy className="size-3.5" />
-                )}
-                {copied ? "Copied" : "Copy hash"}
-              </button>
-            </div>
-          ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1 border-[#E7B66D]/45 bg-white px-2 text-[11px] text-[#0F1939] hover:bg-[#FBF7F0]"
+              onClick={() =>
+                payPageUrl &&
+                window.open(payPageUrl, "_blank", "noopener,noreferrer")
+              }
+              disabled={!payPageUrl || !detailsComplete}
+            >
+              <Wallet className="size-3" />
+              Open
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1 border-[#E7B66D]/45 bg-white px-2 text-[11px] text-[#0F1939] hover:bg-[#FBF7F0]"
+              onClick={() => onCopy(payPageUrl, "link")}
+              disabled={!payPageUrl || !detailsComplete}
+            >
+              <Share2 className="size-3" />
+              {copied === "link" ? "Copied" : "Share"}
+            </Button>
+          </div>
         </div>
-      )}
-    </Shell>
+      </div>
+
+      <div className="mt-auto flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+        <span className="truncate">{formatExpires(expiresAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+const ON_RAMP_PARTNERS = [
+  {
+    id: "moneygram",
+    name: "MoneyGram",
+    desc: "Cash pickup · Bank transfer · Cards",
+    badge: "Best rate",
+  },
+  {
+    id: "banxa",
+    name: "Banxa",
+    desc: "Credit / Debit Card · Apple Pay",
+    badge: "Secure",
+  },
+  {
+    id: "alchemy",
+    name: "Alchemy Pay",
+    desc: "Cards · Local methods",
+    badge: "Low fees",
+  },
+] as const;
+
+function OnRampPanel({
+  currency,
+  vaultName,
+}: {
+  currency: string;
+  vaultName: string;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <h3 className="text-sm font-semibold text-[#0F1939]">
+        Buy {currency} with fiat
+      </h3>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Pay via a partner — {currency} is delivered to{" "}
+        <span className="font-medium text-slate-700">{vaultName}</span>.
+      </p>
+
+      <ul className="mt-3 space-y-2">
+        {ON_RAMP_PARTNERS.map((partner) => (
+          <li
+            key={partner.id}
+            className="flex items-center gap-2.5 rounded-lg border border-[#E7B66D]/35 bg-white px-3 py-2.5"
+          >
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[#E7B66D]/30 bg-[#FBF7F0] text-[10px] font-bold text-[#4A63BE]">
+              {partner.name.slice(0, 1)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <p className="text-xs font-semibold text-[#0F1939]">
+                  {partner.name}
+                </p>
+                <Badge className="border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[9px] text-emerald-700 hover:bg-emerald-50">
+                  {partner.badge}
+                </Badge>
+              </div>
+              <p className="truncate text-[10px] text-slate-500">
+                {partner.desc}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled
+              className="h-8 shrink-0 bg-[#4A63BE]/50 px-3 text-xs text-white"
+            >
+              Soon
+            </Button>
+          </li>
+        ))}
+      </ul>
+
+      <TrustFooter />
+    </div>
   );
 }
 
@@ -759,38 +1356,6 @@ function ExplorerLinks({
           <ExternalLink className="size-3 shrink-0" />
         </a>
       ) : null}
-    </div>
-  );
-}
-
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-svh items-center justify-center bg-[#F8FAFC] px-6 py-12">
-      <div className="w-full max-w-md">{children}</div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
-      <dt className="text-slate-500">{label}</dt>
-      <dd
-        className={cn(
-          "min-w-0 break-all text-slate-900 sm:text-right",
-          mono && "font-mono text-xs",
-        )}
-      >
-        {value}
-      </dd>
     </div>
   );
 }
