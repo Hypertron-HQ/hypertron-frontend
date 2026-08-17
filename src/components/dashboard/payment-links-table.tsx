@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCheck,
   Copy,
@@ -8,6 +8,15 @@ import {
   LoaderCircle,
   RefreshCw,
 } from "lucide-react";
+import {
+  AppSurface,
+  EmptyState,
+  Money,
+  MonoId,
+  SectionLabel,
+  StatusBadge,
+  type StatusTone,
+} from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import {
   getPaymentLinkStatus,
@@ -15,24 +24,18 @@ import {
   type PaymentLinkListItem,
   type PaymentLinkStatus,
 } from "@/lib/payment-links";
-import { cn } from "@/lib/utils";
+import { settleClaimedPaymentLinks } from "@/lib/settle-claimed-links";
 
-const STATUS_STYLES: Record<
-  PaymentLinkStatus,
-  { label: string; className: string }
-> = {
-  paid: {
-    label: "Paid",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  },
-  pending: {
-    label: "Pending",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
-  },
-  expired: {
-    label: "Expired",
-    className: "border-slate-200 bg-slate-100 text-slate-600",
-  },
+const STATUS_TONE: Record<PaymentLinkStatus, StatusTone> = {
+  paid: "paid",
+  pending: "pending",
+  expired: "expired",
+};
+
+const STATUS_LABEL: Record<PaymentLinkStatus, string> = {
+  paid: "Paid",
+  pending: "Pending",
+  expired: "Expired",
 };
 
 function formatAmount(amount: string | null, currency: string) {
@@ -59,16 +62,18 @@ function shortId(id: string) {
 
 export function PaymentLinksTable({
   businessId,
+  walletAddress,
   refreshKey = 0,
 }: {
   businessId: string;
-  /** Bump after creating a link to refetch. */
+  walletAddress?: string;
   refreshKey?: number;
 }) {
   const [links, setLinks] = useState<PaymentLinkListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const settlingRef = useRef(false);
 
   const load = useCallback(async () => {
     const result = await listPaymentLinks(businessId);
@@ -81,14 +86,37 @@ export function PaymentLinksTable({
     setError(null);
     setLinks(result.links);
     setLoading(false);
-  }, [businessId]);
+
+    if (!walletAddress || settlingRef.current) return;
+    const needsConfirm = result.links.some(
+      (link) =>
+        link.claimedAt &&
+        link.claimOutCommitment &&
+        !link.paidAt &&
+        !link.confirmedAt,
+    );
+    if (!needsConfirm) return;
+
+    settlingRef.current = true;
+    try {
+      const settled = await settleClaimedPaymentLinks({
+        walletAddress,
+        links: result.links,
+      });
+      if (settled.confirmed === 0) return;
+
+      const again = await listPaymentLinks(businessId);
+      if (again.ok) setLinks(again.links);
+    } finally {
+      settlingRef.current = false;
+    }
+  }, [businessId, walletAddress]);
 
   useEffect(() => {
     setLoading(true);
     void load();
   }, [load, refreshKey]);
 
-  // Light poll while any link is still unpaid/unexpired so Collect stays current.
   useEffect(() => {
     const hasPending = links.some(
       (link) => getPaymentLinkStatus(link) === "pending",
@@ -112,21 +140,22 @@ export function PaymentLinksTable({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+    <AppSurface padded={false}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-slate-950">
+          <SectionLabel>Records</SectionLabel>
+          <h2 className="mt-1 font-display text-base font-semibold tracking-tight text-foreground">
             Payment links
           </h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            All links for this workspace and their payment status.
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Status for every link in this workspace.
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          className="h-9 gap-2"
           onClick={() => {
             setLoading(true);
             void load();
@@ -143,19 +172,22 @@ export function PaymentLinksTable({
       </div>
 
       {error ? (
-        <div className="px-4 py-4 text-sm text-red-700 sm:px-5">{error}</div>
+        <div className="px-4 py-4 text-sm text-destructive sm:px-5">{error}</div>
       ) : null}
 
       {loading && links.length === 0 ? (
-        <div className="flex items-center gap-2 px-4 py-10 text-sm text-slate-500 sm:px-5">
+        <div className="flex items-center gap-2 px-4 py-10 text-sm text-muted-foreground sm:px-5">
           <LoaderCircle className="size-4 animate-spin" />
           Loading payment links…
         </div>
       ) : null}
 
       {!loading && !error && links.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-slate-400 sm:px-5">
-          No payment links yet. Generate one above to see it here.
+        <div className="px-4 py-6 sm:px-5">
+          <EmptyState
+            title="No payment links yet"
+            description="Generate one above to see it here."
+          />
         </div>
       ) : null}
 
@@ -163,55 +195,58 @@ export function PaymentLinksTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-xs tracking-wide text-slate-400 uppercase">
-                <th className="px-4 py-3 font-medium sm:px-5">Link</th>
-                <th className="px-3 py-3 font-medium">Amount</th>
-                <th className="px-3 py-3 font-medium">Customer</th>
-                <th className="px-3 py-3 font-medium">Status</th>
-                <th className="px-3 py-3 font-medium">Created</th>
-                <th className="px-4 py-3 font-medium sm:px-5">Actions</th>
+              <tr className="border-b border-border text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+                <th className="px-4 py-3 font-semibold sm:px-5">Link</th>
+                <th className="px-3 py-3 font-semibold">Amount</th>
+                <th className="px-3 py-3 font-semibold">Customer</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 font-semibold sm:px-5">Actions</th>
               </tr>
             </thead>
             <tbody>
               {links.map((link) => {
                 const status = getPaymentLinkStatus(link);
-                const style = STATUS_STYLES[status];
                 return (
                   <tr
                     key={link.id}
-                    className="border-b border-slate-100 last:border-0"
+                    className="border-b border-border last:border-0"
                   >
                     <td className="px-4 py-3.5 sm:px-5">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-foreground">
                         {link.purpose?.trim() || "Untitled link"}
                       </p>
-                      <p className="mt-0.5 font-mono text-[11px] text-slate-400">
-                        {shortId(link.id)}
-                        {link.linkMemo ? ` · ${link.linkMemo}` : ""}
+                      <p className="mt-0.5">
+                        <MonoId>
+                          {shortId(link.id)}
+                          {link.linkMemo ? ` · ${link.linkMemo}` : ""}
+                        </MonoId>
                       </p>
                     </td>
-                    <td className="px-3 py-3.5 whitespace-nowrap text-slate-700">
-                      {formatAmount(link.amount, link.currency)}
+                    <td className="px-3 py-3.5 whitespace-nowrap">
+                      <Money
+                        value={formatAmount(link.amount, link.currency).replace(
+                          ` ${link.currency}`,
+                          "",
+                        )}
+                        unit={link.currency}
+                        size="sm"
+                      />
                     </td>
-                    <td className="max-w-[160px] truncate px-3 py-3.5 text-slate-600">
+                    <td className="max-w-[160px] truncate px-3 py-3.5 text-muted-foreground">
                       {link.clientName?.trim() || "—"}
                     </td>
                     <td className="px-3 py-3.5">
-                      <span
-                        className={cn(
-                          "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                          style.className,
-                        )}
-                      >
-                        {style.label}
-                      </span>
+                      <StatusBadge tone={STATUS_TONE[status]}>
+                        {STATUS_LABEL[status]}
+                      </StatusBadge>
                       {status === "paid" && link.paidAt ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
+                        <p className="mt-1 text-[11px] text-muted-foreground">
                           {formatWhen(link.paidAt)}
                         </p>
                       ) : null}
                     </td>
-                    <td className="px-3 py-3.5 whitespace-nowrap text-slate-500">
+                    <td className="px-3 py-3.5 whitespace-nowrap text-muted-foreground">
                       {formatWhen(link.createdAt)}
                     </td>
                     <td className="px-4 py-3.5 sm:px-5">
@@ -220,7 +255,7 @@ export function PaymentLinksTable({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1.5 border-slate-200 bg-white px-2.5 text-xs text-slate-700"
+                          className="h-8 gap-1.5 px-2.5 text-xs"
                           onClick={() => void copyUrl(link)}
                         >
                           {copiedId === link.id ? (
@@ -234,7 +269,7 @@ export function PaymentLinksTable({
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:bg-muted"
                         >
                           Open
                           <ExternalLink className="size-3.5" />
@@ -248,6 +283,6 @@ export function PaymentLinksTable({
           </table>
         </div>
       ) : null}
-    </div>
+    </AppSurface>
   );
 }

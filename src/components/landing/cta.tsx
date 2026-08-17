@@ -1,42 +1,51 @@
 import { ArrowRight } from "lucide-react";
-import { BOOK_DEMO } from "./constants";
+import { FreighterSignupDialog } from "@/components/auth/freighter-signup-dialog";
 import { ScrollFade } from "./reveal";
 
 export function LandingCta() {
   return (
-    <section id="start" className="landing-paper relative">
-      <div className="relative mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8">
+    <section id="start" className="landing-paper relative overflow-hidden">
+      <div className="relative mx-auto w-full px-5 py-8 sm:px-10 lg:px-16">
         <ScrollFade>
-          <div className="flex flex-col gap-10 border-t border-[#d5dce6] py-20 sm:flex-row sm:items-end sm:justify-between sm:py-28">
-            <div className="max-w-xl">
-              <p className="text-[11px] font-medium tracking-[0.2em] text-[#7b8696] uppercase">
-                Early access — invite only
-              </p>
-              <h2 className="mt-4 font-display text-[clamp(2.2rem,4.4vw,3.8rem)] leading-[0.96] tracking-[-0.035em] text-[#1c2433]">
-                Start your rollout.
-              </h2>
-              <p className="mt-5 max-w-md text-sm leading-relaxed text-[#5c6778] sm:text-base">
-                Walk through onboarding, settlements, and the operations
-                dashboard on Stellar.
-              </p>
-            </div>
+          <div className="border-t border-[#d5dce6] py-24 sm:py-32">
+            <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-16">
+              <div>
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[#7b8696] uppercase">
+                  Get started
+                </p>
+                <h2 className="landing-hero-title mt-4 max-w-2xl text-[clamp(2.4rem,5vw,4.2rem)] leading-[0.94] tracking-[-0.04em] text-[#1c2433]">
+                  Build private payments
+                  <br />
+                  into your product.
+                </h2>
+                <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#5c6778]">
+                  Start with the platform, integrate the infrastructure, or
+                  connect through the API. One rail on Stellar.
+                </p>
+              </div>
 
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={BOOK_DEMO}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-12 items-center gap-2 rounded-md bg-[#0b1220] px-6 text-[11px] font-semibold tracking-[0.16em] text-white uppercase transition hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue"
-              >
-                Book a demo
-                <ArrowRight className="size-3.5" />
-              </a>
-              <a
-                href="#product"
-                className="inline-flex h-12 items-center gap-2 rounded-md border border-[#c5cedb] px-6 text-[11px] font-semibold tracking-[0.16em] text-[#1c2433] uppercase transition hover:border-[#1c2433] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue"
-              >
-                Explore product
-              </a>
+              <div className="flex flex-col items-start gap-3 lg:items-end lg:pb-2">
+                <FreighterSignupDialog
+                  triggerLabel="Launch app"
+                  triggerClassName="h-12 rounded-none bg-[#0b1220] px-7 text-[11px] font-semibold tracking-[0.16em] text-white uppercase hover:bg-black"
+                />
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="/docs#quickstart"
+                    className="inline-flex h-11 items-center gap-2 border border-[#c5cedb] px-5 text-[11px] font-medium tracking-[0.15em] text-[#1c2433] uppercase transition hover:border-[#1c2433] hover:text-[#0d1220]"
+                  >
+                    Read API docs
+                    <ArrowRight className="size-3.5" />
+                  </a>
+                  <a
+                    href="#ecosystem"
+                    className="inline-flex h-11 items-center gap-2 border border-[#c5cedb] px-5 text-[11px] font-medium tracking-[0.15em] text-[#1c2433] uppercase transition hover:border-[#1c2433] hover:text-[#0d1220]"
+                  >
+                    Explore protocol
+                    <ArrowRight className="size-3.5" />
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </ScrollFade>

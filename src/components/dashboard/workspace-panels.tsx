@@ -1,7 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Shield, Wallet, RefreshCw, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Loader2,
+  RefreshCw,
+  Shield,
+  Wallet,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  AppSurface,
+  EmptyState,
+  Money,
+  MonoId,
+  PanelShell,
+  SectionLabel,
+  StatusBadge,
+  WarningStrip,
+} from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import type { WalletSession } from "@/lib/auth";
 import {
@@ -17,12 +35,10 @@ import {
 import {
   listNotes,
   updateNote,
-  type StoredNote,
 } from "@/lib/hypertron-note-store";
 import {
   listNotesV2,
   updateNoteV2,
-  type StoredNoteV2,
 } from "@/lib/hypertron-note-store-v2";
 import {
   fullScan,
@@ -36,63 +52,89 @@ import {
   buildUnshieldProof,
   computeNullifier,
 } from "@/lib/hypertron-prover";
-import { deriveNoteSecrets, deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
-import { getWorkspaceTreasury, type Workspace } from "@/mockdata";
-import { fromBaseUnits } from "@/lib/stellar-network";
+import {
+  deriveNoteSecrets,
+  deriveViewingKey,
+  deriveSpendKey,
+} from "@/lib/hypertron-viewkey";
+import type { Workspace } from "@/mockdata";
 
 export { WorkspacePayments } from "@/components/dashboard/workspace-payments";
 
-function titleCase(label: string) {
-  if (!label) return label;
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
+export function WorkspaceOverview({
+  workspace,
+  profile,
+}: {
+  workspace: Workspace;
+  profile?: BusinessProfile;
+}) {
+  const router = useRouter();
+  const privateReady = Boolean(
+    profile?.viewPub?.trim() && profile?.spendPub?.trim(),
+  );
+  const base = `/dashboard/w/${workspace.id}`;
 
-export function WorkspaceOverview({ workspace }: { workspace: Workspace }) {
   return (
     <PanelShell
       eyebrow="Workspace"
       title="Overview"
-      subtitle={`Pulse for ${workspace.name} — collections, settlements, and alerts.`}
+      subtitle={`${workspace.name} — collect, settle, and withdraw on Stellar.`}
     >
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {workspace.pulse.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm"
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AppSurface>
+          <SectionLabel>Next step</SectionLabel>
+          <p className="mt-2 text-sm font-semibold text-foreground">
+            Create a payment link
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Collect XLM, USDC, or EURC. Optional private settlement for XLM on
+            testnet.
+          </p>
+          <Button
+            type="button"
+            className="mt-4 gap-1.5"
+            onClick={() => router.push(`${base}?tab=payments`)}
           >
-            <p className="text-2xl font-semibold tracking-tight text-slate-950">
-              {stat.value}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {titleCase(stat.label)}
-            </p>
+            Go to Payments
+            <ArrowRight className="size-4" />
+          </Button>
+        </AppSurface>
+
+        <AppSurface tone={privateReady ? "shielded" : "muted"}>
+          <SectionLabel>Private settlement</SectionLabel>
+          <div className="mt-2">
+            <StatusBadge tone={privateReady ? "shielded" : "neutral"}>
+              <Shield className="size-3" />
+              {privateReady ? "Enabled" : "Not enabled"}
+            </StatusBadge>
           </div>
-        ))}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {privateReady
+              ? "Shielded notes appear in Treasury after a private link is paid."
+              : "Enable keys in Settings before creating private payment links."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={() =>
+              router.push(
+                privateReady ? `${base}?tab=treasury` : `${base}?tab=settings`,
+              )
+            }
+          >
+            {privateReady ? "Open Treasury" : "Open Settings"}
+          </Button>
+        </AppSurface>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
-          Latest activity
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <span className="font-medium text-emerald-600">
-            {workspace.latest.highlight}
-          </span>
-          {workspace.latest.steps.map((step) => (
-            <span key={step} className="contents">
-              <span className="h-px w-8 bg-slate-200 sm:w-12" />
-              <span>{step}</span>
-            </span>
-          ))}
-        </div>
-      </div>
+      <EmptyState
+        title="No live activity feed yet"
+        description="Overview stays quiet until payment-link and note metrics are wired. Use Payments to collect and Treasury to withdraw."
+      />
     </PanelShell>
   );
 }
-
-type NoteRow = StoredNote & { status: "pending" | "ready" | "spent" };
-
-type NoteRowV2 = StoredNoteV2 & { status: "pending" | "ready" | "spent" };
 
 type UnifiedNoteRow = {
   id: string;
@@ -118,7 +160,6 @@ export function WorkspaceTreasury({
   session: WalletSession;
   profile: BusinessProfile;
 }) {
-  const treasury = getWorkspaceTreasury(workspace.id);
   const [notes, setNotes] = useState<UnifiedNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -446,114 +487,110 @@ export function WorkspaceTreasury({
   const readyTotal = notes
     .filter((n) => n.status === "ready")
     .reduce((sum, n) => sum + Number(n.amount || 0), 0);
+  const readyCount = notes.filter((n) => n.status === "ready").length;
 
   return (
     <PanelShell
       eyebrow="Balances"
       title="Treasury"
-      subtitle="Shielded notes from private payment links, plus mock vault balances."
+      subtitle="Shielded notes from private payment links, recovered in this browser."
+      actions={
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void refresh()}
+          disabled={loading || scanState === "scanning"}
+        >
+          {scanState === "scanning" ? (
+            <>
+              <RefreshCw className="mr-1 size-3.5 animate-spin" />
+              Scanning…
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-1 size-3.5" />
+              Refresh
+            </>
+          )}
+        </Button>
+      }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-5 shadow-sm">
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-amber-700/80 uppercase">
-            Shielded (ready)
-          </p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-            {readyTotal.toFixed(2)} XLM
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {notes.filter((n) => n.status === "ready").length} note(s) withdrawable
-          </p>
+      <AppSurface tone="shielded">
+        <SectionLabel>Shielded · ready</SectionLabel>
+        <div className="mt-2">
+          <Money value={readyTotal.toFixed(2)} unit="XLM" size="lg" />
         </div>
-        {treasury.balances.map((balance) => (
-          <div
-            key={balance.asset}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
-          >
-            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-              {balance.asset}
-            </p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-              {balance.amount}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{balance.status}</p>
-          </div>
-        ))}
-      </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {readyCount} note{readyCount === 1 ? "" : "s"} withdrawable
+        </p>
+      </AppSurface>
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-              Private notes
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Stored in this browser; recovered via viewing key.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void refresh()}
-            disabled={loading || scanState === "scanning"}
-          >
-            {scanState === "scanning" ? (
-              <>
-                <RefreshCw className="mr-1 size-3.5 animate-spin" />
-                Scanning…
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-1 size-3.5" />
-                Refresh
-              </>
-            )}
-          </Button>
-        </div>
+      <AppSurface>
+        <SectionLabel>Private notes</SectionLabel>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Stored locally; recovered via viewing key. Withdrawals require Freighter.
+        </p>
 
-        {scanState === "indexer_down" && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            <AlertTriangle className="size-4 shrink-0" />
-            Indexer unavailable. Some notes may not appear.
-          </div>
-        )}
+        {scanState === "indexer_down" ? (
+          <WarningStrip className="mt-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>Indexer unavailable. Some notes may not appear.</span>
+          </WarningStrip>
+        ) : null}
 
         {error ? (
-          <p className="mt-3 text-sm text-red-600" role="alert">
+          <p className="mt-3 text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}
         {status ? (
-          <p className="mt-2 text-xs text-slate-500">{status}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{status}</p>
         ) : null}
 
         {loading ? (
-          <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
+          <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
             Loading notes…
           </p>
         ) : notes.length === 0 ? (
-          <p className="mt-6 text-sm text-slate-500">
-            {scanState === "empty"
-              ? "No private notes yet. Create a private payment link or receive a private transfer."
-              : "No private notes yet. Create a private payment link from Collect."}
-          </p>
+          <EmptyState
+            className="mt-4"
+            title="No private notes yet"
+            description={
+              scanState === "empty"
+                ? "Create a private payment link or receive a private transfer."
+                : "Create a private payment link from Collect, then refresh after it is paid."
+            }
+          />
         ) : (
-          <ul className="mt-4 divide-y divide-slate-100">
+          <ul className="mt-4 divide-y divide-border">
             {notes.map((note) => (
               <li
                 key={note.id}
                 className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {note.amount} XLM
-                  </p>
-                  <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-                    {note.id.slice(0, 10)}… ·{" "}
-                    <span className="capitalize">{note.origin}</span> ·{" "}
-                    leaf {note.leafIndex ?? "—"} · {note.status}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Money value={note.amount} unit="XLM" size="sm" />
+                    <StatusBadge
+                      tone={
+                        note.status === "ready"
+                          ? "shielded"
+                          : note.status === "spent"
+                            ? "spent"
+                            : "pending"
+                      }
+                    >
+                      {note.status}
+                    </StatusBadge>
+                  </div>
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <MonoId title={note.id}>{note.id.slice(0, 10)}…</MonoId>
+                    <span>·</span>
+                    <span className="capitalize">{note.origin}</span>
+                    <span>·</span>
+                    <span>leaf {note.leafIndex ?? "—"}</span>
                   </p>
                 </div>
                 <Button
@@ -582,7 +619,7 @@ export function WorkspaceTreasury({
             ))}
           </ul>
         )}
-      </div>
+      </AppSurface>
     </PanelShell>
   );
 }
@@ -668,52 +705,47 @@ export function WorkspaceSettingsPanel({
     <PanelShell
       eyebrow="Workspace"
       title="Settings"
-      subtitle="Name, members, and private settlement for this workspace."
+      subtitle="Private settlement keys and workspace identity."
     >
       <div className="max-w-lg space-y-3">
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-            Workspace name
-          </p>
-          <p className="mt-2 text-sm font-semibold text-slate-900">
+        <AppSurface>
+          <SectionLabel>Workspace</SectionLabel>
+          <p className="mt-2 text-sm font-semibold text-foreground">
             {workspace.name}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {workspace.tier} · {workspace.members} members · Role{" "}
-            {workspace.role}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Owner · Freighter-linked
           </p>
-        </div>
+        </AppSurface>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-5 shadow-sm">
+        <AppSurface tone="shielded">
           <div className="flex items-start gap-3">
-            <Shield className="mt-0.5 size-5 shrink-0 text-amber-700" />
+            <Shield className="mt-0.5 size-5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">
+              <p className="text-sm font-semibold text-foreground">
                 Private settlement
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                Derive viewing and spend keys from your Freighter wallet and
-                publish only the public halves. Secrets never leave this
-                browser. Auditors can decrypt with the viewing secret but cannot
-                spend.
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Derive viewing and spend keys from Freighter and publish only
+                the public halves. Secrets never leave this browser.
               </p>
               {profile.viewPub?.trim() && profile.spendPub?.trim() ? (
-                <p className="mt-2 break-all font-mono text-[11px] text-slate-600">
+                <p className="mt-2 break-all dash-mono text-[11px] text-muted-foreground">
                   viewPub {profile.viewPub.slice(0, 18)}… · spendPub{" "}
                   {profile.spendPub.slice(0, 18)}…
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-amber-800">
+                <p className="mt-2 text-xs font-medium">
                   Not enabled yet — required before creating private links.
                 </p>
               )}
               {error ? (
-                <p className="mt-2 text-sm text-red-600" role="alert">
+                <p className="mt-2 text-sm text-destructive" role="alert">
                   {error}
                 </p>
               ) : null}
               {message ? (
-                <p className="mt-2 text-sm text-emerald-700">{message}</p>
+                <p className="mt-2 text-sm text-blue-800">{message}</p>
               ) : null}
               <Button
                 type="button"
@@ -729,30 +761,26 @@ export function WorkspaceSettingsPanel({
               </Button>
             </div>
           </div>
-        </div>
+        </AppSurface>
 
-        {profile.viewPub?.trim() && (
-          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+        {profile.viewPub?.trim() ? (
+          <AppSurface>
             <div className="flex items-start gap-3">
-              <Shield className="mt-0.5 size-5 shrink-0 text-slate-500" />
+              <Shield className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-foreground">
                   Auditor disclosure
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Share the viewing <span className="font-medium">secret</span>{" "}
-                  only with auditors you trust. It decrypts private payment
-                  amounts but cannot spend — spending requires the separate
-                  spend key, which stays in this browser.
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Share the viewing secret only with auditors you trust. It
+                  decrypts amounts but cannot spend.
                 </p>
 
                 <div className="mt-4 space-y-3">
                   <div>
-                    <p className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
-                      Viewing public key (safe to share)
-                    </p>
+                    <SectionLabel>Viewing public key</SectionLabel>
                     <div className="mt-1 flex items-center gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700">
+                      <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-2 py-1 dash-mono text-[11px] text-foreground">
                         {profile.viewPub}
                       </code>
                       <Button
@@ -768,19 +796,15 @@ export function WorkspaceSettingsPanel({
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-100 pt-3">
-                    <p className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
-                      Viewing secret (decrypts amounts — cannot spend)
-                    </p>
-                    <p className="mt-1 text-xs text-amber-700">
-                      Anyone with this secret can decrypt notes addressed to
-                      you, but cannot withdraw or transfer them. Prefer
-                      exporting a redacted audit report when possible. Never
-                      confuse this with the viewing public key above.
+                  <div className="border-t border-border pt-3">
+                    <SectionLabel>Viewing secret</SectionLabel>
+                    <p className="mt-1 text-xs text-[color:var(--shielded-foreground)]">
+                      Decrypts notes; cannot withdraw. Prefer a redacted audit
+                      export when possible.
                     </p>
                     {showSecret && viewSecret ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded bg-amber-50 px-2 py-1 font-mono text-[11px] text-slate-700">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <code className="min-w-0 flex-1 truncate rounded-lg bg-[color:var(--shielded)] px-2 py-1 dash-mono text-[11px] text-foreground">
                           {viewSecret}
                         </code>
                         <Button
@@ -819,36 +843,9 @@ export function WorkspaceSettingsPanel({
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </AppSurface>
+        ) : null}
       </div>
     </PanelShell>
-  );
-}
-
-function PanelShell({
-  eyebrow,
-  title,
-  subtitle,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
-          {eyebrow}
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          {title}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-      </div>
-      {children}
-    </div>
   );
 }

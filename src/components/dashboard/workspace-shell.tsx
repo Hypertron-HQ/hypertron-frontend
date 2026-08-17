@@ -119,7 +119,12 @@ export function WorkspaceShell({
     >
       {!ready ? null : (
         <>
-          {tab === "overview" ? <WorkspaceOverview workspace={workspace} /> : null}
+          {tab === "overview" ? (
+            <WorkspaceOverview
+              workspace={workspace}
+              profile={currentProfile}
+            />
+          ) : null}
           {tab === "payments" ? (
             <WorkspacePayments
               workspace={workspace}

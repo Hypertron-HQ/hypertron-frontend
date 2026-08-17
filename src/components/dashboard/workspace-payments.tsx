@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Calendar,
   CheckCheck,
   ChevronDown,
   Copy,
-  ExternalLink,
   Info,
   Shield,
   User,
@@ -15,6 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AppSurface,
+  EmptyState,
+  StatusBadge,
+} from "@/components/dashboard/ui";
 import { PaymentLinksTable } from "@/components/dashboard/payment-links-table";
 import type { WalletSession } from "@/lib/auth";
 import {
@@ -87,7 +91,7 @@ function TokenLogo({
 }
 
 const fieldCls =
-  "h-11 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
+  "h-11 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/20";
 
 export function WorkspacePayments({
   workspace,
@@ -122,15 +126,6 @@ export function WorkspacePayments({
   const [linksRefreshKey, setLinksRefreshKey] = useState(0);
 
   const vaultName = `${workspace.name} Vault`;
-
-  const previewLabel = useMemo(() => {
-    const parts = [
-      amount.trim() || "0",
-      currency,
-      description.trim() || "untitled",
-    ];
-    return parts.join(" · ");
-  }, [amount, currency, description]);
 
   function setPrivateSettlementOn(next: boolean) {
     setPrivateSettlement(next);
@@ -286,7 +281,7 @@ export function WorkspacePayments({
   return (
     <div className="space-y-5">
       <nav
-        className="flex gap-5 border-b border-slate-200"
+        className="flex gap-5 border-b border-border"
         aria-label="Payments sections"
       >
         {SUB_TABS.map((tab) => {
@@ -297,7 +292,7 @@ export function WorkspacePayments({
                 key={tab.id}
                 title="Coming soon"
                 aria-disabled="true"
-                className="relative cursor-not-allowed pb-3 text-sm font-medium text-slate-400 opacity-45"
+                className="relative cursor-not-allowed pb-3 text-sm font-medium text-muted-foreground/50"
               >
                 {tab.label}
               </span>
@@ -311,13 +306,13 @@ export function WorkspacePayments({
               className={cn(
                 "relative pb-3 text-sm font-medium transition-colors",
                 active
-                  ? "text-[#2563EB]"
-                  : "text-slate-500 hover:text-slate-800",
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {tab.label}
               {active ? (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2563EB]" />
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />
               ) : null}
             </button>
           );
@@ -325,359 +320,352 @@ export function WorkspacePayments({
       </nav>
 
       {subTab === "send" ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-12 text-center text-sm text-slate-400">
-          Send payments UI coming next — use Collect to create a payment link.
-        </div>
+        <EmptyState
+          title="Send is not available yet"
+          description="Use Collect to create a payment link. Multi-input private send will land after the transfer_n checkout path is wired."
+        />
       ) : (
         <>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
-                Create a Payment Link
+          <AppSurface className="p-4 lg:p-5">
+            <div className="mb-6">
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                Create a payment link
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Collect payments in XLM, USDC, or EURC on Stellar. Funds settle
-                to your global pool with memo attribution.
+              <p className="mt-1 text-sm text-muted-foreground">
+                Collect XLM, USDC, or EURC on Stellar. Choose transparent
+                settlement or shielded pool settlement for XLM.
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 shrink-0 gap-2 border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50"
-              title={previewLabel}
-            >
-              Preview Payment Page
-              <ExternalLink className="size-3.5" />
-            </Button>
-          </div>
 
-          {error ? (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
+            {error ? (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
 
-          {result ? (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-emerald-800">
-                  Payment link ready
-                </p>
-                <p className="mt-0.5 truncate font-mono text-xs text-emerald-700">
-                  {result.url}
-                </p>
-                {result.memo ? (
-                  <p className="mt-1 font-mono text-[11px] text-emerald-700/80">
-                    memo {result.memo}
+            {result ? (
+              <div className="mb-6 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-blue-900">
+                    Payment link ready
                   </p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 shrink-0 gap-2 border-emerald-200 bg-white text-emerald-800"
-                onClick={copyLink}
-              >
-                {copied ? (
-                  <CheckCheck className="size-4" />
-                ) : (
-                  <Copy className="size-4" />
-                )}
-                {copied ? "Copied" : "Copy link"}
-              </Button>
-            </div>
-          ) : null}
-
-          <form onSubmit={handleGenerate} className="flex flex-col gap-6">
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
-              <div className="flex flex-col gap-5">
-                <div className="space-y-2">
-                  <Label htmlFor="amount" className="text-sm font-medium text-slate-700">
-                    Amount
-                  </Label>
-                  <div className="flex overflow-hidden rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20">
-                    <Input
-                      id="amount"
-                      type="text"
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="h-11 flex-1 rounded-none border-0 focus-visible:ring-0"
-                      placeholder="0.00"
-                      required
-                    />
-                    <label className="relative flex h-11 w-[148px] shrink-0 items-center gap-2 border-l border-slate-200 bg-slate-50 px-2.5">
-                      <TokenLogo currency={currency} className="size-5" />
-                      <select
-                        value={currency}
-                        onChange={(e) =>
-                          setCurrency(e.target.value as Currency)
-                        }
-                        className="h-full w-full appearance-none bg-transparent pr-5 text-sm font-medium text-slate-700 outline-none"
-                        aria-label="Currency"
-                      >
-                        {CURRENCY_OPTIONS.map((opt) => (
-                          <option
-                            key={opt.value}
-                            value={opt.value}
-                            disabled={
-                              privateSettlement && opt.value !== "XLM"
-                            }
-                          >
-                            {opt.value}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-2 size-3.5 text-slate-400" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor="description"
-                      className="text-sm font-medium text-slate-700"
-                    >
-                      Description{" "}
-                      <span className="font-normal text-slate-400">
-                        (optional)
-                      </span>
-                    </Label>
-                    <span className="text-xs text-slate-400">
-                      {description.length}/140
-                    </span>
-                  </div>
-                  <Input
-                    id="description"
-                    value={description}
-                    maxLength={140}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className={fieldCls}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="customer"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Customer{" "}
-                    <span className="font-normal text-slate-400">(optional)</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="customer"
-                      value={customer}
-                      onChange={(e) => setCustomer(e.target.value)}
-                      placeholder="Enter name, email or wallet address"
-                      className={cn(fieldCls, "pr-10")}
-                    />
-                    <User className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="expiry"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Payment Link Expiry
-                  </Label>
-                  <div className="relative">
-                    <select
-                      id="expiry"
-                      value={expiry}
-                      onChange={(e) => setExpiry(e.target.value)}
-                      className={cn(
-                        fieldCls,
-                        "w-full appearance-none px-3 pr-10 outline-none",
-                      )}
-                    >
-                      {EXPIRY_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <Calendar className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="metadata"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Metadata{" "}
-                    <span className="font-normal text-slate-400">(optional)</span>
-                  </Label>
-                  <textarea
-                    id="metadata"
-                    value={metadata}
-                    onChange={(e) => setMetadata(e.target.value)}
-                    placeholder="Add order ID, project ID, or any reference"
-                    rows={4}
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/40 p-5">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Settlement &amp; Privacy
-                  </h2>
-                  <Info className="size-3.5 text-slate-400" />
-                </div>
-
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <TokenLogo
-                      currency={currency}
-                      className="size-10 rounded-lg"
-                    />
-                    <div>
-                      <p className="text-xs text-slate-500">Settlement Rail</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Stellar · {currency}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                    Active
-                  </span>
-                </div>
-
-                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-slate-900">
-                          Private Settlement
-                        </p>
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
-                          Beta · Testnet
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        {privateSettlement
-                          ? profile.viewPub?.trim() && profile.spendPub?.trim()
-                            ? "You pre-mint the note; the customer only funds it. Amount stays public on deposit."
-                            : "First use will ask Freighter for viewing + spend keys, then pre-mint the note."
-                          : "Public Stellar payment straight to your Freighter wallet (G…) with memo attribution."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={privateSettlement}
-                      aria-label="Enable private settlement"
-                      onClick={() => setPrivateSettlementOn(!privateSettlement)}
-                      className={cn(
-                        "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                        privateSettlement ? "bg-amber-600" : "bg-slate-300",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform",
-                          privateSettlement && "translate-x-5",
-                        )}
-                      />
-                    </button>
-                  </div>
-                  <div className="flex gap-3 rounded-lg bg-white/80 px-3 py-2.5">
-                    <Shield className="mt-0.5 size-4 shrink-0 text-slate-400" />
-                    <p className="text-xs leading-relaxed text-slate-500">
-                      {privateSettlement
-                        ? "XLM only on the live testnet pool. Not audited — testnet only."
-                        : "Payer sends a classic Freighter payment. Privacy pool stays off."}
+                  <p className="mt-0.5 truncate dash-mono text-xs text-blue-800">
+                    {result.url}
+                  </p>
+                  {result.memo ? (
+                    <p className="mt-1 dash-mono text-[11px] text-blue-800/80">
+                      memo {result.memo}
                     </p>
-                  </div>
+                  ) : null}
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-500">
-                    {privateSettlement
-                      ? "Checkout will invoke pool deposit on the Hypertron transfer contract."
-                      : "Settles to your wallet · attributed via memo (not the privacy pool)"}
-                  </p>
-                  <div className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                      <Wallet className="size-5 text-slate-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {vaultName}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {privateSettlement
-                          ? "Shielded pool (testnet)"
-                          : "Transparent settlement"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 border-t border-slate-200 pt-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex flex-col gap-2">
-                <button
+                <Button
                   type="button"
-                  onClick={() => setAdvancedOpen((o) => !o)}
-                  className="flex items-center gap-1 text-sm font-medium text-[#2563EB] hover:text-[#1d4ed8]"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 gap-2"
+                  onClick={copyLink}
                 >
-                  Advanced Options
-                  <ChevronDown
-                    className={cn(
-                      "size-4 transition-transform",
-                      advancedOpen && "rotate-180",
-                    )}
-                  />
-                </button>
-                {advancedOpen ? (
-                  <div className="max-w-xs space-y-1.5">
-                    <Label
-                      htmlFor="workflow"
-                      className="text-xs text-slate-500"
-                    >
-                      Workflow stage (optional)
-                    </Label>
+                  {copied ? (
+                    <CheckCheck className="size-4" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  {copied ? "Copied" : "Copy link"}
+                </Button>
+              </div>
+            ) : null}
+
+            <form onSubmit={handleGenerate} className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+                <div className="flex flex-col gap-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount</Label>
+                    <div className="flex overflow-hidden rounded-lg border border-input focus-within:ring-2 focus-within:ring-ring/20">
+                      <Input
+                        id="amount"
+                        type="text"
+                        inputMode="decimal"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="h-11 flex-1 rounded-none border-0 focus-visible:ring-0"
+                        placeholder="0.00"
+                        required
+                      />
+                      <label className="relative flex h-11 w-[148px] shrink-0 items-center gap-2 border-l border-input bg-muted/50 px-2.5">
+                        <TokenLogo currency={currency} className="size-5" />
+                        <select
+                          value={currency}
+                          onChange={(e) =>
+                            setCurrency(e.target.value as Currency)
+                          }
+                          className="h-full w-full appearance-none bg-transparent pr-5 text-sm font-medium text-foreground outline-none"
+                          aria-label="Currency"
+                        >
+                          {CURRENCY_OPTIONS.map((opt) => (
+                            <option
+                              key={opt.value}
+                              value={opt.value}
+                              disabled={
+                                privateSettlement && opt.value !== "XLM"
+                              }
+                            >
+                              {opt.value}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2 size-3.5 text-muted-foreground" />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="description">
+                        Description{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (optional)
+                        </span>
+                      </Label>
+                      <span className="text-xs text-muted-foreground">
+                        {description.length}/140
+                      </span>
+                    </div>
                     <Input
-                      id="workflow"
-                      value={workflowStage}
-                      onChange={(e) => setWorkflowStage(e.target.value)}
-                      placeholder="e.g. pending approval"
+                      id="description"
+                      value={description}
+                      maxLength={140}
+                      onChange={(e) => setDescription(e.target.value)}
                       className={fieldCls}
                     />
                   </div>
-                ) : null}
-              </div>
 
-              <div className="flex flex-col items-stretch gap-2 sm:items-end">
-                {status ? (
-                  <p className="text-xs text-slate-500">{status}</p>
-                ) : null}
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 min-w-[200px] bg-[#2563EB] px-6 text-white hover:bg-[#1d4ed8]"
+                  <div className="space-y-2">
+                    <Label htmlFor="customer">
+                      Customer{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="customer"
+                        value={customer}
+                        onChange={(e) => setCustomer(e.target.value)}
+                        placeholder="Name, email, or wallet"
+                        className={cn(fieldCls, "pr-10")}
+                      />
+                      <User className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="expiry">Link expiry</Label>
+                    <div className="relative">
+                      <select
+                        id="expiry"
+                        value={expiry}
+                        onChange={(e) => setExpiry(e.target.value)}
+                        className={cn(
+                          fieldCls,
+                          "w-full appearance-none px-3 pr-10 outline-none",
+                        )}
+                      >
+                        {EXPIRY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <Calendar className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata">
+                      Metadata{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </Label>
+                    <textarea
+                      id="metadata"
+                      value={metadata}
+                      onChange={(e) => setMetadata(e.target.value)}
+                      placeholder="Order ID, project ID, or reference"
+                      rows={4}
+                      className="w-full resize-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    "flex flex-col gap-4 rounded-xl border p-5",
+                    privateSettlement
+                      ? "border-[color:var(--shielded-border)] bg-[color:var(--shielded)]/40"
+                      : "border-border bg-muted/40",
+                  )}
                 >
-                  {loading ? "Generating…" : "Generate Payment Link"}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-foreground">
+                      Settlement rail
+                    </h2>
+                    <Info className="size-3.5 text-muted-foreground" />
+                  </div>
 
-        <PaymentLinksTable
-          businessId={workspace.id}
-          refreshKey={linksRefreshKey}
-        />
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <TokenLogo
+                        currency={currency}
+                        className="size-10 rounded-lg"
+                      />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Asset</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          Stellar · {currency}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge tone={privateSettlement ? "shielded" : "paid"}>
+                      {privateSettlement ? "Shielded" : "Transparent"}
+                    </StatusBadge>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "space-y-2 rounded-lg border px-4 py-3",
+                      privateSettlement
+                        ? "border-[color:var(--shielded-border)] bg-card/80"
+                        : "border-border bg-card",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-foreground">
+                            Private settlement
+                          </p>
+                          <StatusBadge tone="neutral">Beta · Testnet</StatusBadge>
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                          {privateSettlement
+                            ? profile.viewPub?.trim() && profile.spendPub?.trim()
+                              ? "You pre-mint the note; the customer funds the pool deposit. Deposit amount stays public on-chain."
+                              : "First use asks Freighter for viewing + spend keys, then pre-mints the note."
+                            : "Public Stellar payment to your Freighter wallet with memo attribution."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={privateSettlement}
+                        aria-label="Enable private settlement"
+                        onClick={() =>
+                          setPrivateSettlementOn(!privateSettlement)
+                        }
+                        className={cn(
+                          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                          privateSettlement ? "bg-amber-600" : "bg-muted-foreground/30",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform",
+                            privateSettlement && "translate-x-5",
+                          )}
+                        />
+                      </button>
+                    </div>
+                    <div className="flex gap-3 rounded-lg bg-muted/60 px-3 py-2.5">
+                      <Shield className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        {privateSettlement
+                          ? "XLM only on the live testnet pool. Not audited."
+                          : "Payer sends a classic Freighter payment. Privacy pool stays off."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {privateSettlement
+                        ? "Checkout invokes pool deposit on the Hypertron transfer contract."
+                        : "Settles to your wallet · attributed via memo"}
+                    </p>
+                    <div className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Wallet className="size-5 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {vaultName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {privateSettlement
+                            ? "Shielded pool (testnet)"
+                            : "Transparent settlement"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedOpen((o) => !o)}
+                    className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    Advanced options
+                    <ChevronDown
+                      className={cn(
+                        "size-4 transition-transform",
+                        advancedOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  {advancedOpen ? (
+                    <div className="max-w-xs space-y-1.5">
+                      <Label
+                        htmlFor="workflow"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Workflow stage (optional)
+                      </Label>
+                      <Input
+                        id="workflow"
+                        value={workflowStage}
+                        onChange={(e) => setWorkflowStage(e.target.value)}
+                        placeholder="e.g. pending approval"
+                        className={fieldCls}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                  {status ? (
+                    <p className="text-xs text-muted-foreground">{status}</p>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="h-11 min-w-[200px] px-6"
+                  >
+                    {loading ? "Generating…" : "Generate payment link"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </AppSurface>
+
+          <PaymentLinksTable
+            businessId={workspace.id}
+            walletAddress={session.walletAddress}
+            refreshKey={linksRefreshKey}
+          />
         </>
       )}
     </div>

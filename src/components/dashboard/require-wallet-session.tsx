@@ -63,7 +63,7 @@ export function RequireWalletSession({
 
   if (session === undefined) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
+      <div className="flex min-h-svh items-center justify-center bg-navy text-sm text-white/65">
         Loading…
       </div>
     );
@@ -73,7 +73,7 @@ export function RequireWalletSession({
 
   if (profile === undefined) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
+      <div className="flex min-h-svh items-center justify-center bg-navy text-sm text-white/65">
         Loading…
       </div>
     );
@@ -81,13 +81,13 @@ export function RequireWalletSession({
 
   if (loadError || profile === null) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-[#F8FAFC] px-6 text-center">
-        <p className="text-sm text-slate-600">
+      <div className="surface-light flex min-h-svh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <p className="text-sm text-muted-foreground">
           {loadError ?? "Could not load your workspace."}
         </p>
         <button
           type="button"
-          className="text-sm font-semibold text-[#2563EB]"
+          className="text-sm font-semibold text-primary"
           onClick={() => window.location.reload()}
         >
           Retry

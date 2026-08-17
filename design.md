@@ -215,6 +215,46 @@ Respect `prefers-reduced-motion: reduce` (instant opacity, no ambient loop).
 
 ---
 
+## App surfaces (authenticated dashboard)
+
+Product UI is the **Hypertron Operations Console** — payments, treasury, and programmable privacy. Same brand as marketing; different density.
+
+| Token / surface | Value | Role |
+|---|---|---|
+| Void Navy | `#070B14` | Nav rail / stage |
+| Work Surface | `#F6F8FB` | Main panel background (`.surface-light`) |
+| Paper | `#FFFFFF` | Cards / forms |
+| Ledger Ink | `#111827` | Primary text |
+| Stellar Blue | `#2563EB` | Primary actions / active nav |
+| Signal Yellow | `#FFF971` | Shielded / private state only |
+
+### Rules
+
+1. **No fake KPIs.** If a metric is unavailable, use empty/setup copy — never `"—"`, canned timelines, or mock vault balances presented as live.
+2. **Settlement rail** is the signature: transparent Stellar settlement vs shielded pool settlement must look different (amber/yellow shielded rail vs cool paper transparent rail).
+3. **Type jobs:** Aeonik for page titles + amounts (`.dash-amount`); Inter for controls; mono only for addresses, commitments, tx hashes.
+4. **Radius:** 12–16px max on app surfaces. No 22–28px soft blobs.
+5. **Chrome:** dark nav rail + light work surface. No stock-photo dashboard background. No decorative dual search or fake notification dots.
+6. **Status map:** pending = amber/yellow signal; paid/settled = blue; expired/spent = muted; error = destructive; shielded = yellow rail.
+7. **Motion:** micro only (row hover, status change). No ambient glow on app panels. Respect `prefers-reduced-motion`.
+
+### Layout
+
+```
+Desktop                              Mobile
+┌──────────┬──────────────────────┐  ┌─────────────────────────┐
+│ Brand    │ Context + actions    │  │ Header + menu + action  │
+│ Nav      ├──────────────────────┤  ├─────────────────────────┤
+│          │ Setup / empty state  │  │ Setup / empty state     │
+│          │ Primary workflow     │  │ Primary workflow        │
+│ Identity │ Records              │  │ Records                 │
+└──────────┴──────────────────────┘  └─────────────────────────┘
+```
+
+Shared primitives live under `src/components/dashboard/` (`PanelShell`, `AppSurface`, `StatusBadge`, `Money`, `EmptyState`, `WarningStrip`).
+
+---
+
 ## File ownership
 
 | Artifact | Path |
@@ -223,13 +263,14 @@ Respect `prefers-reduced-motion: reduce` (instant opacity, no ambient loop).
 | Tokens + atmosphere | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` + `public/fonts/` |
 | Landing | `src/app/page.tsx` (+ small components under `src/components/landing/` if needed) |
+| Dashboard | `src/components/dashboard/` |
 | UI kit | shadcn/ui in `src/components/ui/` (`components.json`) |
 
 ### shadcn conventions
 
-- Prefer `@/components/ui/*` for interactive primitives (Button, Dialog, Input, etc.).
+- Prefer `@/components/ui/*` for interactive primitives (Button, Dialog, Input, Sheet, etc.).
 - Dark chrome uses root tokens (`primary` = blue `#2563eb`).
-- White hub panel: wrap with `.surface-light`.
+- Authenticated work surface: wrap with `.surface-light`.
 - Extra button variants: `fog` (white CTA), `signal` (yellow CTA), `glass` (outline on dark).
 
 When in doubt: open `legacy/src/styles/globals.css` and the marketing mono components — then map choices back to the tokens above (blue + yellow only; no purple).
