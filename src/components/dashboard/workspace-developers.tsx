@@ -177,7 +177,7 @@ export function WorkspaceDevelopers() {
 
       <form
         onSubmit={handleCreate}
-        className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
+        className="rounded-2xl border border-slate-200 bg-white px-5 py-5"
       >
         <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
           Create API key

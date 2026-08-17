@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { BusinessSetupForm } from "@/components/onboarding/business-setup-form";
 import {
   getBusinessProfile,
   isBusinessProfileComplete,
@@ -13,12 +12,15 @@ import { fetchAuthMe, type WalletSession } from "@/lib/auth";
 export function RequireWalletSession({
   children,
   unauthenticated,
+  /** Allow incomplete profiles (used by the create-workspace wizard). */
+  allowIncompleteProfile = false,
 }: {
   children: (
     session: WalletSession,
     profile: BusinessProfile,
   ) => ReactNode;
   unauthenticated?: ReactNode;
+  allowIncompleteProfile?: boolean;
 }) {
   const router = useRouter();
   const allowUnauthenticated = unauthenticated !== undefined;
@@ -61,9 +63,20 @@ export function RequireWalletSession({
     };
   }, [allowUnauthenticated, router]);
 
+  const needsOnboarding =
+    Boolean(session) &&
+    Boolean(profile) &&
+    !isBusinessProfileComplete(profile!) &&
+    !allowIncompleteProfile;
+
+  useEffect(() => {
+    if (!needsOnboarding) return;
+    router.replace("/dashboard/workspaces/new");
+  }, [needsOnboarding, router]);
+
   if (session === undefined) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
+      <div className="flex min-h-svh items-center justify-center bg-[#0F1939] text-sm text-white/60">
         Loading…
       </div>
     );
@@ -73,7 +86,7 @@ export function RequireWalletSession({
 
   if (profile === undefined) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
+      <div className="flex min-h-svh items-center justify-center bg-[#0F1939] text-sm text-white/60">
         Loading…
       </div>
     );
@@ -81,13 +94,13 @@ export function RequireWalletSession({
 
   if (loadError || profile === null) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-[#F8FAFC] px-6 text-center">
-        <p className="text-sm text-slate-600">
+      <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-[#0F1939] px-6 text-center">
+        <p className="text-sm text-white/70">
           {loadError ?? "Could not load your workspace."}
         </p>
         <button
           type="button"
-          className="text-sm font-semibold text-[#2563EB]"
+          className="text-sm font-semibold text-[#E7B66D]"
           onClick={() => window.location.reload()}
         >
           Retry
@@ -96,12 +109,11 @@ export function RequireWalletSession({
     );
   }
 
-  if (!isBusinessProfileComplete(profile)) {
+  if (needsOnboarding) {
     return (
-      <BusinessSetupForm
-        walletAddress={session.walletAddress}
-        onComplete={(next) => setProfile(next)}
-      />
+      <div className="flex min-h-svh items-center justify-center bg-[#0F1939] text-sm text-white/60">
+        Opening workspace setup…
+      </div>
     );
   }
 

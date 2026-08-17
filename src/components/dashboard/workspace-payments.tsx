@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaymentLinksTable } from "@/components/dashboard/payment-links-table";
+import { PaymentsSendTab } from "@/components/dashboard/payments-send-tab";
 import type { WalletSession } from "@/lib/auth";
 import {
   getBusinessProfile,
@@ -87,7 +88,13 @@ function TokenLogo({
 }
 
 const fieldCls =
-  "h-11 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
+  "h-11 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#4A63BE] focus-visible:ring-[#4A63BE]/20";
+
+const secondaryBtnCls =
+  "h-10 shrink-0 gap-2 rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50";
+
+const primaryBtnCls =
+  "h-11 min-w-[200px] rounded-xl bg-gradient-to-r from-[#121F46] to-[#4A63BE] px-6 font-semibold text-white shadow-[0_8px_20px_rgba(18,31,70,0.22)] hover:brightness-110";
 
 export function WorkspacePayments({
   workspace,
@@ -285,6 +292,18 @@ export function WorkspacePayments({
 
   return (
     <div className="space-y-5">
+      <div>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#C9A46A] uppercase">
+          Payments
+        </p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-950">
+          {workspace.name} Payments
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Create links, settle on Stellar, and track status for this workspace.
+        </p>
+      </div>
+
       <nav
         className="flex gap-5 border-b border-slate-200"
         aria-label="Payments sections"
@@ -311,13 +330,13 @@ export function WorkspacePayments({
               className={cn(
                 "relative pb-3 text-sm font-medium transition-colors",
                 active
-                  ? "text-[#2563EB]"
+                  ? "text-[#0F1939]"
                   : "text-slate-500 hover:text-slate-800",
               )}
             >
               {tab.label}
               {active ? (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2563EB]" />
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-[#121F46] to-[#4A63BE]" />
               ) : null}
             </button>
           );
@@ -325,17 +344,22 @@ export function WorkspacePayments({
       </nav>
 
       {subTab === "send" ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-12 text-center text-sm text-slate-400">
-          Send payments UI coming next — use Collect to create a payment link.
-        </div>
+        <PaymentsSendTab
+          workspace={workspace}
+          session={session}
+          profile={profile}
+        />
       ) : (
         <>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-5">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+                No-code collection
+              </p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
                 Create a Payment Link
-              </h1>
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Collect payments in XLM, USDC, or EURC on Stellar. Funds settle
                 to your global pool with memo attribution.
@@ -344,7 +368,7 @@ export function WorkspacePayments({
             <Button
               type="button"
               variant="outline"
-              className="h-10 shrink-0 gap-2 border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50"
+              className={secondaryBtnCls}
               title={previewLabel}
             >
               Preview Payment Page
@@ -353,13 +377,13 @@ export function WorkspacePayments({
           </div>
 
           {error ? (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-6 rounded-xl border border-rose-100 bg-rose-50/80 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
           ) : null}
 
           {result ? (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-emerald-800">
                   Payment link ready
@@ -377,7 +401,7 @@ export function WorkspacePayments({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 shrink-0 gap-2 border-emerald-200 bg-white text-emerald-800"
+                className="h-8 shrink-0 gap-2 rounded-xl border-emerald-200 bg-white text-emerald-800"
                 onClick={copyLink}
               >
                 {copied ? (
@@ -397,7 +421,7 @@ export function WorkspacePayments({
                   <Label htmlFor="amount" className="text-sm font-medium text-slate-700">
                     Amount
                   </Label>
-                  <div className="flex overflow-hidden rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20">
+                  <div className="flex overflow-hidden rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-[#4A63BE]/20">
                     <Input
                       id="amount"
                       type="text"
@@ -520,20 +544,25 @@ export function WorkspacePayments({
                     onChange={(e) => setMetadata(e.target.value)}
                     placeholder="Add order ID, project ID, or any reference"
                     rows={4}
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#4A63BE] focus:ring-2 focus:ring-[#4A63BE]/20"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-[#F8F9FC] p-5">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Settlement &amp; Privacy
-                  </h2>
-                  <Info className="size-3.5 text-slate-400" />
+                  <div>
+                    <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+                      Settlement &amp; Privacy
+                    </p>
+                    <h2 className="mt-1 text-sm font-semibold text-slate-900">
+                      How this link settles
+                    </h2>
+                  </div>
+                  <Info className="ml-auto size-3.5 text-slate-400" />
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-3">
                     <TokenLogo
                       currency={currency}
@@ -546,19 +575,19 @@ export function WorkspacePayments({
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                     Active
                   </span>
                 </div>
 
-                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3">
+                <div className="space-y-2 rounded-xl border border-[#E7B66D]/55 bg-[#FBF7F0] px-4 py-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-slate-900">
                           Private Settlement
                         </p>
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
+                        <span className="rounded-md bg-[#4A63BE] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
                           Beta · Testnet
                         </span>
                       </div>
@@ -578,7 +607,7 @@ export function WorkspacePayments({
                       onClick={() => setPrivateSettlementOn(!privateSettlement)}
                       className={cn(
                         "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                        privateSettlement ? "bg-amber-600" : "bg-slate-300",
+                        privateSettlement ? "bg-[#C9A46A]" : "bg-slate-300",
                       )}
                     >
                       <span
@@ -589,8 +618,8 @@ export function WorkspacePayments({
                       />
                     </button>
                   </div>
-                  <div className="flex gap-3 rounded-lg bg-white/80 px-3 py-2.5">
-                    <Shield className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <div className="flex gap-3 rounded-xl border border-[#E7B66D]/25 bg-white/90 px-3 py-2.5">
+                    <Shield className="mt-0.5 size-4 shrink-0 text-[#C9A46A]" />
                     <p className="text-xs leading-relaxed text-slate-500">
                       {privateSettlement
                         ? "XLM only on the live testnet pool. Not audited — testnet only."
@@ -605,9 +634,9 @@ export function WorkspacePayments({
                       ? "Checkout will invoke pool deposit on the Hypertron transfer contract."
                       : "Settles to your wallet · attributed via memo (not the privacy pool)"}
                   </p>
-                  <div className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                      <Wallet className="size-5 text-slate-600" />
+                  <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#4A63BE] text-white">
+                      <Wallet className="size-5" strokeWidth={1.9} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900">
@@ -629,7 +658,7 @@ export function WorkspacePayments({
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen((o) => !o)}
-                  className="flex items-center gap-1 text-sm font-medium text-[#2563EB] hover:text-[#1d4ed8]"
+                  className="flex items-center gap-1 text-sm font-medium text-[#4A63BE] hover:text-[#121F46]"
                 >
                   Advanced Options
                   <ChevronDown
@@ -665,7 +694,7 @@ export function WorkspacePayments({
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="h-11 min-w-[200px] bg-[#2563EB] px-6 text-white hover:bg-[#1d4ed8]"
+                  className={primaryBtnCls}
                 >
                   {loading ? "Generating…" : "Generate Payment Link"}
                 </Button>

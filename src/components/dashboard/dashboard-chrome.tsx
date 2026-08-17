@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -45,25 +44,29 @@ export function DashboardChrome({
 }) {
   const identityTitle = identity?.title ?? "Not signed in";
   return (
-    <div className="relative min-h-svh overflow-hidden text-white">
-      <Image
-        src="/dashboard-bg.png"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover"
+    <div className="relative min-h-svh overflow-hidden bg-[#0F1939] text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 left-[8%] size-[28rem] rounded-full bg-[#E7B66D]/12 blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(59,130,246,0.18),transparent_55%),linear-gradient(180deg,rgba(5,7,13,0.55),rgba(5,7,13,0.82))]"
+        className="pointer-events-none absolute top-[18%] -left-24 size-[22rem] rounded-full border border-[#E7B66D]/15"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[8%] bottom-[-8rem] size-[32rem] rounded-full bg-[#4A63BE]/18 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[18%] top-[12%] size-[18rem] rounded-full border border-white/8"
       />
 
       <div className="relative z-10 flex min-h-svh gap-3 p-3 md:gap-4 md:p-4">
         <aside className="flex w-[220px] shrink-0 flex-col py-2 pb-10 pl-1">
           <Link href="/dashboard" className="flex items-center gap-2.5 px-3 pt-2">
             <HypertronLogoMark size={32} />
-            <span className="font-display text-[15px] font-semibold tracking-tight">
+            <span className="font-display text-[15px] font-semibold tracking-tight text-white">
               Hypertron
             </span>
           </Link>
@@ -71,21 +74,21 @@ export function DashboardChrome({
           <div className="mt-5 px-3">
             <label className="relative flex h-10 items-center rounded-full border border-white/10 bg-white/[0.06]">
               <Search
-                className="pointer-events-none absolute left-3.5 size-4 text-slate-400"
+                className="pointer-events-none absolute left-3.5 size-4 text-white/45"
                 strokeWidth={1.75}
               />
               <input
                 type="search"
                 placeholder="Search"
-                className="h-full w-full rounded-full bg-transparent pr-10 pl-10 text-sm text-white placeholder:text-slate-400 focus:outline-none"
+                className="h-full w-full rounded-full bg-transparent pr-10 pl-10 text-sm text-white placeholder:text-white/40 focus:outline-none"
               />
-              <kbd className="pointer-events-none absolute right-2 flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-1.5 text-[11px] font-medium text-slate-400">
+              <kbd className="pointer-events-none absolute right-2 flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-1.5 text-[11px] font-medium text-white/40">
                 /
               </kbd>
             </label>
           </div>
 
-          <nav className="mt-5 flex flex-1 flex-col gap-0.5 px-2">
+          <nav className="mt-5 flex flex-1 flex-col gap-1 px-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = activeId === item.id;
@@ -95,14 +98,28 @@ export function DashboardChrome({
                   type="button"
                   onClick={() => onSelect(item.id)}
                   className={[
-                    "flex h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium transition",
+                    "relative flex h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium transition",
                     active
-                      ? "bg-blue-500/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.55)]"
-                      : "text-slate-300 hover:bg-white/[0.05] hover:text-white",
+                      ? "bg-gradient-to-r from-[#E7B66D]/22 via-[#E7B66D]/10 to-transparent text-white shadow-[inset_0_0_0_1px_rgba(231,182,109,0.28)]"
+                      : "text-white/55 hover:bg-white/[0.05] hover:text-white",
                   ].join(" ")}
                 >
-                  <Icon className="size-4 shrink-0" strokeWidth={1.85} />
-                  {item.label}
+                  {active ? (
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-[#E7B66D] shadow-[0_0_12px_rgba(231,182,109,0.65)]"
+                    />
+                  ) : null}
+                  <Icon
+                    className={[
+                      "size-4 shrink-0",
+                      active ? "text-[#E7B66D]" : "text-white/45",
+                    ].join(" ")}
+                    strokeWidth={1.85}
+                  />
+                  <span className={active ? "text-white" : undefined}>
+                    {item.label}
+                  </span>
                 </button>
               );
             })}
@@ -113,15 +130,18 @@ export function DashboardChrome({
               type="button"
               className="flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium text-white transition hover:bg-white/[0.05]"
             >
-              <CircleHelp className="size-4" strokeWidth={1.85} />
+              <CircleHelp
+                className="size-4 text-[#E7B66D]"
+                strokeWidth={1.85}
+              />
               Help &amp; Support
             </button>
 
             <Link
               href="/dashboard"
-              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] px-3.5 py-3.5 text-left transition hover:bg-white/[0.1]"
+              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3.5 text-left shadow-[inset_0_0_0_1px_rgba(231,182,109,0.08)] transition hover:bg-white/[0.09]"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white ring-1 ring-white/10">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#4A63BE]/25 text-[#E7B66D] ring-1 ring-[#E7B66D]/25">
                 <ShieldUser className="size-5" strokeWidth={1.75} />
               </div>
               <div className="min-w-0 flex-1">
@@ -130,7 +150,7 @@ export function DashboardChrome({
                 </p>
                 {identity?.subtitle ? (
                   <p
-                    className="truncate font-mono text-xs text-slate-400"
+                    className="truncate font-mono text-xs text-white/45"
                     title={identity.subtitle}
                   >
                     {identity.subtitle}
@@ -138,7 +158,7 @@ export function DashboardChrome({
                 ) : null}
               </div>
               <ChevronsUpDown
-                className="size-4 shrink-0 text-[#60A5FA]"
+                className="size-4 shrink-0 text-[#E7B66D]"
                 strokeWidth={2}
               />
             </Link>

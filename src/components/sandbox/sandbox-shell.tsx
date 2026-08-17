@@ -13,20 +13,18 @@ import {
   Wallet,
 } from "lucide-react";
 import { DashboardChrome } from "@/components/dashboard/dashboard-chrome";
+import { WorkspaceOverview } from "@/components/dashboard/workspace-overview";
 import {
-  WorkspaceOverview,
-  WorkspacePayments,
-  WorkspaceSettingsPanel,
-  WorkspaceTreasury,
-} from "@/components/dashboard/workspace-panels";
+  SandboxPayments,
+  SandboxSettings,
+  SandboxTreasury,
+} from "@/components/sandbox/sandbox-panels";
 import {
   WORKSPACE_TABS,
   isWorkspaceTab,
   type WorkspaceTab,
 } from "@/components/dashboard/workspace-types";
-import type { BusinessProfile } from "@/lib/business";
-import type { WalletSession } from "@/lib/auth";
-import type { Workspace } from "@/mockdata";
+import { SANDBOX_WALLET, SANDBOX_WORKSPACE } from "@/lib/sandbox-demo";
 
 const TAB_ICONS = {
   overview: LayoutDashboard,
@@ -63,18 +61,9 @@ function readTabFromUrl(): WorkspaceTab {
   return isWorkspaceTab(value) ? value : "overview";
 }
 
-export function WorkspaceShell({
-  workspace,
-  session,
-  profile,
-}: {
-  workspace: Workspace;
-  session: WalletSession;
-  profile: BusinessProfile;
-}) {
+export function SandboxShell() {
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [ready, setReady] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState(profile);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -82,11 +71,6 @@ export function WorkspaceShell({
       setReady(true);
     });
   }, []);
-
-  // Keep local profile when parent remounts with a different business.
-  if (profile.businessId !== currentProfile.businessId) {
-    setCurrentProfile(profile);
-  }
 
   const selectTab = useCallback((next: string) => {
     if (!isWorkspaceTab(next)) return;
@@ -110,47 +94,33 @@ export function WorkspaceShell({
       navItems={navItems}
       activeId={tab}
       onSelect={selectTab}
-      breadcrumb={`${workspace.name} / ${meta.label}`}
+      breadcrumb={`${SANDBOX_WORKSPACE.name} / ${meta.label}`}
       searchPlaceholder={meta.searchPlaceholder}
       identity={{
-        title: currentProfile.name.trim() || workspace.name,
-        subtitle: session.walletAddress,
+        title: SANDBOX_WORKSPACE.name,
+        subtitle: SANDBOX_WALLET,
       }}
     >
+      <div className="mb-5 rounded-xl border border-[#E7B66D]/35 bg-[#FBF7F0] px-4 py-3 text-sm text-[#0F1939]">
+        <span className="font-semibold text-[#C9A46A]">Sandbox</span>
+        {" — "}
+        Demo workspace with sample data only. No wallet, API, or on-chain
+        actions.
+      </div>
+
       {!ready ? null : (
         <>
           {tab === "overview" ? (
             <WorkspaceOverview
-              workspace={workspace}
-              session={session}
-              profile={currentProfile}
+              workspace={SANDBOX_WORKSPACE}
+              demo
               onCreatePaymentLink={() => selectTab("payments")}
               onViewAllPayments={() => selectTab("payments")}
             />
           ) : null}
-          {tab === "payments" ? (
-            <WorkspacePayments
-              workspace={workspace}
-              session={session}
-              profile={currentProfile}
-              onProfileUpdated={setCurrentProfile}
-            />
-          ) : null}
-          {tab === "treasury" ? (
-            <WorkspaceTreasury
-              workspace={workspace}
-              session={session}
-              profile={currentProfile}
-            />
-          ) : null}
-          {tab === "settings" ? (
-            <WorkspaceSettingsPanel
-              workspace={workspace}
-              session={session}
-              profile={currentProfile}
-              onProfileUpdated={setCurrentProfile}
-            />
-          ) : null}
+          {tab === "payments" ? <SandboxPayments /> : null}
+          {tab === "treasury" ? <SandboxTreasury /> : null}
+          {tab === "settings" ? <SandboxSettings /> : null}
         </>
       )}
     </DashboardChrome>

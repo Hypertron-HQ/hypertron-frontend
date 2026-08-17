@@ -1,11 +1,21 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { RequireWalletSession } from "@/components/dashboard/require-wallet-session";
 import { WorkspaceShell } from "@/components/dashboard/workspace-shell";
-import { businessToWorkspace, type BusinessProfile } from "@/lib/business";
+import {
+  businessToWorkspace,
+  getBusinessProfile,
+  type BusinessProfile,
+} from "@/lib/business";
 import type { WalletSession } from "@/lib/auth";
+import type { Workspace } from "@/mockdata";
+import {
+  activateWorkspace,
+  getWorkspace,
+  workspaceRecordToView,
+} from "@/lib/workspaces";
 
 export default function WorkspaceDashboardPage() {
   const params = useParams<{ workspaceId: string }>();
@@ -34,17 +44,59 @@ function WorkspaceGate({
   profile: BusinessProfile;
 }) {
   const router = useRouter();
-  const mismatch = Boolean(
-    workspaceId && workspaceId !== profile.businessId,
-  );
+  const [resolved, setResolved] = useState<{
+    workspace: Workspace;
+    profile: BusinessProfile;
+  } | null>(null);
 
   useEffect(() => {
-    if (mismatch) {
+    let cancelled = false;
+    if (!workspaceId) {
       router.replace("/dashboard");
+      return;
     }
-  }, [mismatch, router]);
 
-  if (mismatch) {
+    void (async () => {
+      const activated = await activateWorkspace(workspaceId);
+      if (!activated.ok && workspaceId !== profile.businessId) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const [workspaceResult, profileResult] = await Promise.all([
+        getWorkspace(workspaceId),
+        getBusinessProfile(),
+      ]);
+      if (cancelled) return;
+
+      if (workspaceResult.ok && profileResult.ok) {
+        setResolved({
+          workspace: workspaceRecordToView(
+            workspaceResult.workspace,
+            session.walletAddress,
+          ),
+          profile: profileResult.profile,
+        });
+        return;
+      }
+
+      // Backward-compatible path while the workspace API is being deployed.
+      if (workspaceId === profile.businessId) {
+        setResolved({
+          workspace: businessToWorkspace(profile, session.walletAddress),
+          profile,
+        });
+        return;
+      }
+      router.replace("/dashboard");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, router, session.walletAddress, workspaceId]);
+
+  if (!resolved) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-void text-sm text-mist">
         Loading workspace…
@@ -52,13 +104,11 @@ function WorkspaceGate({
     );
   }
 
-  const workspace = businessToWorkspace(profile, session.walletAddress);
-
   return (
     <WorkspaceShell
-      workspace={workspace}
+      workspace={resolved.workspace}
       session={session}
-      profile={profile}
+      profile={resolved.profile}
     />
   );
 }
