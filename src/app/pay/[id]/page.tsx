@@ -9,7 +9,7 @@ export default function PayPage() {
 
   if (!id) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-[#F8FAFC] text-sm text-slate-500">
+      <div className="flex min-h-svh items-center justify-center bg-[radial-gradient(ellipse_at_top,_#FBF7F0_0%,_#F4F6FB_45%,_#EEF1F8_100%)] text-sm text-slate-500">
         Missing payment link.
       </div>
     );

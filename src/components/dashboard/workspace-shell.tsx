@@ -7,12 +7,14 @@ import {
   useState,
 } from "react";
 import {
+  Code2,
   CreditCard,
   LayoutDashboard,
   Settings,
   Wallet,
 } from "lucide-react";
 import { DashboardChrome } from "@/components/dashboard/dashboard-chrome";
+import { WorkspaceDevelopers } from "@/components/dashboard/workspace-developers";
 import {
   WorkspaceOverview,
   WorkspacePayments,
@@ -32,6 +34,7 @@ const TAB_ICONS = {
   overview: LayoutDashboard,
   payments: CreditCard,
   treasury: Wallet,
+  developers: Code2,
   settings: Settings,
 } as const;
 
@@ -41,7 +44,7 @@ const TAB_META: Record<
 > = {
   overview: {
     label: "Overview",
-    searchPlaceholder: "Search overview",
+    searchPlaceholder: "Search workspace...",
   },
   payments: {
     label: "Payments",
@@ -50,6 +53,10 @@ const TAB_META: Record<
   treasury: {
     label: "Treasury",
     searchPlaceholder: "Search treasury",
+  },
+  developers: {
+    label: "Developers",
+    searchPlaceholder: "Search API keys",
   },
   settings: {
     label: "Settings",
@@ -119,7 +126,15 @@ export function WorkspaceShell({
     >
       {!ready ? null : (
         <>
-          {tab === "overview" ? <WorkspaceOverview workspace={workspace} /> : null}
+          {tab === "overview" ? (
+            <WorkspaceOverview
+              workspace={workspace}
+              session={session}
+              profile={currentProfile}
+              onCreatePaymentLink={() => selectTab("payments")}
+              onViewAllPayments={() => selectTab("payments")}
+            />
+          ) : null}
           {tab === "payments" ? (
             <WorkspacePayments
               workspace={workspace}
@@ -132,6 +147,12 @@ export function WorkspaceShell({
             <WorkspaceTreasury
               workspace={workspace}
               session={session}
+              profile={currentProfile}
+            />
+          ) : null}
+          {tab === "developers" ? (
+            <WorkspaceDevelopers
+              workspace={workspace}
               profile={currentProfile}
             />
           ) : null}

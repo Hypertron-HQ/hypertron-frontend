@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  checkPaymentLinkStatus,
   getPaymentLinkStatus,
   listPaymentLinks,
+  parsePrivateSettlement,
   type PaymentLinkListItem,
   type PaymentLinkStatus,
 } from "@/lib/payment-links";
+import { getStellarExpertTxUrl } from "@/lib/stellar-network";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<
@@ -78,6 +81,29 @@ export function PaymentLinksTable({
       setLoading(false);
       return;
     }
+
+    // Classic (non-private) pending links: nudge Horizon reconcile on refresh so
+    // status does not wait solely on the backend 30s scheduler.
+    const pendingClassic = result.links.filter((link) => {
+      if (getPaymentLinkStatus(link) !== "pending") return false;
+      return !parsePrivateSettlement(link.metadata);
+    });
+
+    if (pendingClassic.length > 0) {
+      await Promise.allSettled(
+        pendingClassic
+          .slice(0, 12)
+          .map((link) => checkPaymentLinkStatus(link.id)),
+      );
+      const refreshed = await listPaymentLinks(businessId);
+      if (refreshed.ok) {
+        setError(null);
+        setLinks(refreshed.links);
+        setLoading(false);
+        return;
+      }
+    }
+
     setError(null);
     setLinks(result.links);
     setLoading(false);
@@ -112,10 +138,13 @@ export function PaymentLinksTable({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-slate-950">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+            Workspace links
+          </p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-950">
             Payment links
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
@@ -126,7 +155,7 @@ export function PaymentLinksTable({
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          className="h-9 gap-2 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
           onClick={() => {
             setLoading(true);
             void load();
@@ -143,7 +172,7 @@ export function PaymentLinksTable({
       </div>
 
       {error ? (
-        <div className="px-4 py-4 text-sm text-red-700 sm:px-5">{error}</div>
+        <div className="px-4 py-4 text-sm text-rose-700 sm:px-5">{error}</div>
       ) : null}
 
       {loading && links.length === 0 ? (
@@ -154,7 +183,7 @@ export function PaymentLinksTable({
       ) : null}
 
       {!loading && !error && links.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-slate-400 sm:px-5">
+        <div className="mx-4 my-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-400 sm:mx-5">
           No payment links yet. Generate one above to see it here.
         </div>
       ) : null}
@@ -163,19 +192,22 @@ export function PaymentLinksTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-xs tracking-wide text-slate-400 uppercase">
-                <th className="px-4 py-3 font-medium sm:px-5">Link</th>
-                <th className="px-3 py-3 font-medium">Amount</th>
-                <th className="px-3 py-3 font-medium">Customer</th>
-                <th className="px-3 py-3 font-medium">Status</th>
-                <th className="px-3 py-3 font-medium">Created</th>
-                <th className="px-4 py-3 font-medium sm:px-5">Actions</th>
+              <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] tracking-[0.08em] text-slate-400 uppercase">
+                <th className="px-4 py-3 font-semibold sm:px-5">Link</th>
+                <th className="px-3 py-3 font-semibold">Amount</th>
+                <th className="px-3 py-3 font-semibold">Customer</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 font-semibold sm:px-5">Actions</th>
               </tr>
             </thead>
             <tbody>
               {links.map((link) => {
                 const status = getPaymentLinkStatus(link);
                 const style = STATUS_STYLES[status];
+                const txHash =
+                  link.paymentTxHash?.trim() || link.claimTxHash?.trim() || null;
+                const explorerUrl = txHash ? getStellarExpertTxUrl(txHash) : null;
                 return (
                   <tr
                     key={link.id}
@@ -190,7 +222,7 @@ export function PaymentLinksTable({
                         {link.linkMemo ? ` · ${link.linkMemo}` : ""}
                       </p>
                     </td>
-                    <td className="px-3 py-3.5 whitespace-nowrap text-slate-700">
+                    <td className="px-3 py-3.5 whitespace-nowrap font-medium text-slate-900">
                       {formatAmount(link.amount, link.currency)}
                     </td>
                     <td className="max-w-[160px] truncate px-3 py-3.5 text-slate-600">
@@ -199,15 +231,15 @@ export function PaymentLinksTable({
                     <td className="px-3 py-3.5">
                       <span
                         className={cn(
-                          "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                           style.className,
                         )}
                       >
                         {style.label}
                       </span>
-                      {status === "paid" && link.paidAt ? (
+                      {status === "paid" && (link.paidAt || link.claimedAt) ? (
                         <p className="mt-1 text-[11px] text-slate-400">
-                          {formatWhen(link.paidAt)}
+                          {formatWhen(link.paidAt || link.claimedAt)}
                         </p>
                       ) : null}
                     </td>
@@ -220,7 +252,7 @@ export function PaymentLinksTable({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1.5 border-slate-200 bg-white px-2.5 text-xs text-slate-700"
+                          className="h-8 gap-1.5 rounded-xl border-slate-200 bg-white px-2.5 text-xs text-slate-700"
                           onClick={() => void copyUrl(link)}
                         >
                           {copiedId === link.id ? (
@@ -230,15 +262,25 @@ export function PaymentLinksTable({
                           )}
                           {copiedId === link.id ? "Copied" : "Copy"}
                         </Button>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        >
-                          Open
-                          <ExternalLink className="size-3.5" />
-                        </a>
+                        {explorerUrl ? (
+                          <a
+                            href={explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        ) : (
+                          <span
+                            title="Available after payment is confirmed"
+                            className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 text-xs font-medium text-slate-400"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

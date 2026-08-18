@@ -35,6 +35,7 @@ export type Workspace = {
   id: string;
   name: string;
   initial: string;
+  logoUrl?: string | null;
   members: number;
   tier: string;
   role: WorkspaceRole;

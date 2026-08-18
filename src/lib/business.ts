@@ -107,10 +107,10 @@ export async function linkReceiveAddress(
   }
 }
 
-/** Map core Business → dashboard Workspace shape (pulse placeholders for now). */
+/** Map core Business → dashboard Workspace shape. */
 export function businessToWorkspace(
   profile: BusinessProfile,
-  walletAddress: string,
+  _walletAddress: string,
 ): Workspace {
   const name = profile.name.trim() || "Workspace";
   const initial = name.slice(0, 1).toUpperCase();
@@ -122,15 +122,10 @@ export function businessToWorkspace(
     tier: profile.selectedTierName?.trim() || "Starter",
     role: "Owner",
     lastAccessed: "Just now",
-    pulse: [
-      { value: "—", label: "Collected", warn: false },
-      { value: "—", label: "Pending", warn: false },
-      { value: "—", label: "Settled", warn: false },
-      { value: shorten(walletAddress), label: "Wallet", warn: false },
-    ],
+    pulse: [],
     latest: {
-      highlight: "Ready",
-      steps: ["Connect wallet", "Create payment link", "Share checkout"],
+      highlight: "",
+      steps: [],
     },
     directory: {
       openTasks: "0",
@@ -138,9 +133,4 @@ export function businessToWorkspace(
       complianceAlerts: "None",
     },
   };
-}
-
-function shorten(address: string) {
-  if (address.length < 12) return address;
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }

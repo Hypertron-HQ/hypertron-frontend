@@ -139,7 +139,7 @@ export function HubAudit() {
           <span className="font-mono text-xs">k</span>).
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
           <div className="flex items-start gap-3">
             <Shield className="mt-0.5 size-5 shrink-0 text-slate-500" />
             <div className="min-w-0 flex-1">
@@ -226,7 +226,7 @@ export function HubAudit() {
         )}
 
         {hasScanned && notes.length > 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
               <div>
                 <p className="text-sm font-semibold text-slate-900">
@@ -434,7 +434,7 @@ export function HubSettingsPanel({
       <div className="max-w-lg space-y-4">
         <form
           onSubmit={handleSave}
-          className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm"
+          className="rounded-2xl border border-slate-200 bg-white px-5 py-5"
         >
           <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
             Business profile
@@ -489,7 +489,7 @@ export function HubSettingsPanel({
           </button>
         </form>
 
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
           <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
             Connected wallet
           </p>

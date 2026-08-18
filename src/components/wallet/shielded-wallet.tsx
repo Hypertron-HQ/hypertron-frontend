@@ -193,7 +193,7 @@ export function ShieldedWallet() {
         </div>
 
         {!wallet ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <p className="mb-4 text-sm text-slate-600">
               Connect your Freighter wallet to view and manage your shielded
               balance.
@@ -234,13 +234,13 @@ export function ShieldedWallet() {
           </div>
         ) : (
           <>
-            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
               <p className="truncate text-xs font-mono text-slate-500">
                 {wallet}
               </p>
             </div>
 
-            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-semibold tracking-[0.12em] text-amber-700/80 uppercase">
@@ -283,7 +283,7 @@ export function ShieldedWallet() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="mb-4 text-sm font-medium text-slate-700">
                 Top up with XLM
               </p>
@@ -338,7 +338,7 @@ export function ShieldedWallet() {
             </div>
 
             {notes.length > 0 && (
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
                 <p className="mb-3 text-sm font-medium text-slate-700">
                   Your notes
                 </p>

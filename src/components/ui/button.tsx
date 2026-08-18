@@ -20,12 +20,12 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
         /** Marketing white CTA on dark surfaces */
-        fog: "rounded-full bg-fog text-void hover:bg-white/90",
+        fog: "rounded-none bg-fog text-void hover:bg-white/90",
         /** Yellow signal CTA (design.md) */
-        signal: "rounded-full bg-yellow text-void hover:bg-[#fffba8]",
+        signal: "rounded-none bg-yellow text-void hover:bg-[#fffba8]",
         /** Glass outline on dark surfaces */
         glass:
-          "rounded-full border-line bg-glass text-fog backdrop-blur-xl hover:border-white/25 hover:bg-white/[0.07]",
+          "rounded-none border-line bg-glass text-fog backdrop-blur-xl hover:border-white/25 hover:bg-white/[0.07]",
       },
       size: {
         default:
