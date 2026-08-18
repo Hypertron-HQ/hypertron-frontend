@@ -1,28 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  CheckCircle,
-  Download,
-  ExternalLink,
-  Loader2,
-  Search,
-  Shield,
-  XCircle,
-} from "lucide-react";
-import {
-  AppSurface,
-  EmptyState,
-  Money,
-  MonoId,
-  PanelShell,
-  SectionLabel,
-  StatusBadge,
-  WarningStrip,
-} from "@/components/dashboard/ui";
+import { useEffect, useState, type ReactNode } from "react";
+import { Loader2, Shield, CheckCircle, XCircle, Download, Search, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   updateBusinessProfile,
   type BusinessProfile,
@@ -38,6 +18,7 @@ import {
   type AuditedNote,
 } from "@/lib/hypertron-auditor";
 import { ensureProverReady } from "@/lib/hypertron-prover";
+import { getBillingPlan } from "@/mockdata";
 
 export function HubAudit() {
   const [viewSecret, setViewSecret] = useState("");
@@ -122,8 +103,7 @@ export function HubAudit() {
   }
 
   function handleExport(format: "csv" | "json") {
-    const content =
-      format === "csv" ? exportAuditCsv(notes) : exportAuditJson(notes);
+    const content = format === "csv" ? exportAuditCsv(notes) : exportAuditJson(notes);
     const blob = new Blob([content], {
       type: format === "csv" ? "text/csv" : "application/json",
     });
@@ -147,107 +127,114 @@ export function HubAudit() {
   return (
     <PanelShell
       eyebrow="Compliance"
-      title="Auditor disclosure"
-      subtitle="Paste a viewing secret to scan private payment amounts off-chain. Do not paste the viewing public key."
+      title="Auditor Disclosure"
+      subtitle="Paste a viewing secret to scan and verify private payment amounts off-chain. Do not paste the viewing public key."
     >
       <div className="max-w-2xl space-y-4">
-        <WarningStrip>
-          <Shield className="mt-0.5 size-4 shrink-0" />
-          <span>
-            The viewing secret decrypts note amounts for disclosure. It cannot
-            spend. Exports omit spendable note fields.
-          </span>
-        </WarningStrip>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          The viewing <span className="font-semibold">secret</span> decrypts
+          note amounts for disclosure. It cannot spend — nullifiers and
+          withdrawals require the separate spend key. Exports omit note fields
+          (<span className="font-mono text-xs">ownerPk</span>,{" "}
+          <span className="font-mono text-xs">k</span>).
+        </div>
 
-        <AppSurface>
-          <SectionLabel>Viewing secret</SectionLabel>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Enter the 64-hex viewing secret from workspace Settings → Reveal
-            secret.
-          </p>
-          <Input
-            type="text"
-            value={viewSecret}
-            onChange={(e) => setViewSecret(e.target.value)}
-            placeholder="0x… viewing secret (not viewPub)"
-            className="mt-3 h-11 dash-mono"
-          />
-          <Label className="mt-3 block text-xs font-medium text-muted-foreground">
-            Matching viewPub (optional)
-            <Input
-              type="text"
-              value={knownViewPub}
-              onChange={(e) => setKnownViewPub(e.target.value)}
-              placeholder="0x… merchant viewPub"
-              className="mt-1.5 h-11 dash-mono"
-            />
-          </Label>
-          {error ? (
-            <p className="mt-2 text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              onClick={() => void handleScan()}
-              disabled={scanning || !viewSecret.trim()}
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Scanning…
-                </>
-              ) : (
-                <>
-                  <Search className="mr-2 size-4" />
-                  Scan blobs
-                </>
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+          <div className="flex items-start gap-3">
+            <Shield className="mt-0.5 size-5 shrink-0 text-slate-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900">
+                Viewing secret
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                Enter the viewing secret (64 hex characters) from the merchant
+                Settings → Reveal secret. The viewing public key (
+                <span className="font-mono">viewPub</span>) looks similar but
+                cannot decrypt notes.
+              </p>
+              <input
+                type="text"
+                value={viewSecret}
+                onChange={(e) => setViewSecret(e.target.value)}
+                placeholder="0x… viewing secret (not viewPub)"
+                className="mt-3 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <label className="mt-3 block text-xs font-medium text-slate-600">
+                Matching viewPub (optional — catches public/secret mix-ups)
+                <input
+                  type="text"
+                  value={knownViewPub}
+                  onChange={(e) => setKnownViewPub(e.target.value)}
+                  placeholder="0x… merchant viewPub"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </label>
+              {error && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {error}
+                </p>
               )}
-            </Button>
-            {hasScanned ? (
-              <Button type="button" variant="outline" onClick={handleClear}>
-                Clear
-              </Button>
-            ) : null}
+              <div className="mt-4 flex items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={() => void handleScan()}
+                  disabled={scanning || !viewSecret.trim()}
+                >
+                  {scanning ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Scanning…
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 size-4" />
+                      Scan blobs
+                    </>
+                  )}
+                </Button>
+                {hasScanned && (
+                  <Button type="button" variant="outline" onClick={handleClear}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-        </AppSurface>
+        </div>
 
-        {hasScanned && stats ? (
-          <AppSurface tone="muted" className="py-4">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              <span>
-                <span className="font-semibold text-foreground">
+        {hasScanned && stats && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <span className="text-slate-600">
+                <span className="font-semibold text-slate-900">
                   {stats.totalScanned}
                 </span>{" "}
                 blobs scanned
               </span>
-              <span>
-                <span className="font-semibold text-foreground">
+              <span className="text-slate-600">
+                <span className="font-semibold text-slate-900">
                   {stats.totalMatched}
                 </span>{" "}
                 notes decrypted
               </span>
-              <span>
+              <span className="text-slate-600">
                 Last ledger:{" "}
-                <span className="dash-mono text-foreground">
-                  {stats.lastLedger}
-                </span>
+                <span className="font-mono">{stats.lastLedger}</span>
               </span>
             </div>
-          </AppSurface>
-        ) : null}
+          </div>
+        )}
 
-        {hasScanned && notes.length > 0 ? (
-          <AppSurface padded={false}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
+        {hasScanned && notes.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">
+                <p className="text-sm font-semibold text-slate-900">
                   Decrypted notes ({notes.length})
                 </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Explorer links open the pool contract call, not a classic
-                  payment row.
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Explorer links open the pool contract call (opaque args), not a
+                  classic payment row.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -271,37 +258,49 @@ export function HubAudit() {
                 </Button>
               </div>
             </div>
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-slate-100">
               {notes.map((note) => (
                 <li key={note.commitment} className="px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Money value={note.amount} unit="XLM" size="sm" />
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-semibold text-slate-900">
+                          {note.amount} XLM
+                        </p>
                         {note.verified ? (
-                          <StatusBadge tone="paid">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                             <CheckCircle className="size-3" />
                             Verified
-                          </StatusBadge>
+                          </span>
                         ) : (
-                          <StatusBadge tone="pending">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                             <XCircle className="size-3" />
                             Pending
-                          </StatusBadge>
+                          </span>
                         )}
                       </div>
-                      <p className="mt-1">
-                        <MonoId title={note.commitment}>
-                          Commitment: {note.commitment.slice(0, 20)}…
-                          {note.commitment.slice(-8)}
-                        </MonoId>
+                      <p className="mt-1 font-mono text-[11px] text-slate-500">
+                        Commitment: {note.commitment.slice(0, 20)}…
+                        {note.commitment.slice(-8)}
                       </p>
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <p>
+                          <span className="text-slate-400">Amount (stroops):</span>{" "}
+                          <span className="font-mono">{note.amountBaseUnits}</span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Leaf index:</span>{" "}
+                          <span className="font-mono">
+                            {note.leafIndex ?? "—"}
+                          </span>
+                        </p>
+                      </div>
                       {note.explorerUrl ? (
                         <a
                           href={note.explorerUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
                         >
                           View on StellarExpert
                           <ExternalLink className="size-3" />
@@ -309,43 +308,65 @@ export function HubAudit() {
                       ) : null}
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-xs text-muted-foreground">Ledger</p>
-                      <p className="dash-mono text-sm text-foreground">
+                      <p className="text-xs text-slate-400">Ledger</p>
+                      <p className="font-mono text-sm text-slate-700">
                         {note.ledger}
                       </p>
+                      {note.txHash ? (
+                        <p className="mt-1 max-w-[9rem] truncate font-mono text-[10px] text-slate-400">
+                          {note.txHash.slice(0, 10)}…
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </li>
               ))}
             </ul>
-          </AppSurface>
-        ) : null}
+          </div>
+        )}
 
-        {hasScanned && notes.length === 0 && !error ? (
-          <EmptyState
-            title="No notes found for this viewing secret"
-            description="Common mistake: pasting viewPub instead of the viewing secret. Otherwise no notes were sent to this key yet, or the indexer has no blobs."
-          />
-        ) : null}
+        {hasScanned && notes.length === 0 && !error && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-8 text-center">
+            <p className="text-sm text-slate-600">
+              No notes found for this viewing secret.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              Common mistake: pasting the viewing <span className="font-medium">public</span>{" "}
+              key (<span className="font-mono">viewPub</span>) instead of the
+              viewing secret. Paste the secret from Settings → Reveal secret, or
+              fill in the matching viewPub above to catch that mix-up before
+              scanning.
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              Otherwise no notes were sent to this key yet, or the indexer has no
+              blobs.
+            </p>
+          </div>
+        )}
       </div>
     </PanelShell>
   );
 }
 
 export function HubBilling() {
+  const billing = getBillingPlan();
+
   return (
     <PanelShell
       eyebrow="Account"
-      title="Billing"
-      subtitle="Plans and invoices are not live yet."
+      title="Billing & Plans"
+      subtitle="Manage your plan, invoices, and usage."
     >
-      <EmptyState
-        title="Billing coming later"
-        description="Hypertron is on testnet. There is no production plan, usage meter, or invoice history to show here."
-      />
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+        <p className="text-sm font-semibold text-slate-900">{billing.planName}</p>
+        <p className="mt-1 text-sm text-slate-500">{billing.planDescription}</p>
+      </div>
     </PanelShell>
   );
 }
+
+const fieldCls =
+  "mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
 
 export function HubSettingsPanel({
   profile,
@@ -408,75 +429,107 @@ export function HubSettingsPanel({
     <PanelShell
       eyebrow="Account"
       title="Settings"
-      subtitle="Profile and session for this account hub."
+      subtitle="Profile and session preferences for this workspace hub."
     >
       <div className="max-w-lg space-y-4">
-        <AppSurface>
-          <form onSubmit={handleSave} className="space-y-4">
-            <SectionLabel>Business profile</SectionLabel>
+        <form
+          onSubmit={handleSave}
+          className="rounded-2xl border border-slate-200 bg-white px-5 py-5"
+        >
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            Business profile
+          </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="biz-name">Business name</Label>
-              <Input
-                id="biz-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="h-11"
-              />
-            </div>
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            Business name
+            <input
+              className={fieldCls}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </label>
 
-            <div className="space-y-2">
-              <Label htmlFor="biz-type">Business type</Label>
-              <Input
-                id="biz-type"
-                value={businessNature}
-                onChange={(e) => setBusinessNature(e.target.value)}
-                placeholder="Agency, SaaS, marketplace…"
-                className="h-11"
-              />
-            </div>
+          <label className="mt-3 block text-sm font-medium text-slate-700">
+            Business type
+            <input
+              className={fieldCls}
+              value={businessNature}
+              onChange={(e) => setBusinessNature(e.target.value)}
+              placeholder="Agency, SaaS, marketplace…"
+            />
+          </label>
 
-            <div className="space-y-2">
-              <Label htmlFor="biz-email">Email</Label>
-              <Input
-                id="biz-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="h-11"
-              />
-            </div>
+          <label className="mt-3 block text-sm font-medium text-slate-700">
+            Email
+            <input
+              type="email"
+              className={fieldCls}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+            />
+          </label>
 
-            {error ? (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved ? (
-              <p className="text-sm text-blue-800">Profile saved.</p>
-            ) : null}
+          {error ? (
+            <p className="mt-3 text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {saved ? (
+            <p className="mt-3 text-sm text-emerald-600">Profile saved.</p>
+          ) : null}
 
-            <Button type="submit" disabled={saving} className="h-10">
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-          </form>
-        </AppSurface>
+          <button
+            type="submit"
+            disabled={saving}
+            className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </form>
 
-        <AppSurface>
-          <SectionLabel>Connected wallet</SectionLabel>
-          <p className="mt-2 dash-mono text-sm text-foreground">{walletShort}</p>
-          <Button
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            Connected wallet
+          </p>
+          <p className="mt-2 font-mono text-sm text-slate-800">{walletShort}</p>
+          <button
             type="button"
-            variant="outline"
-            className="mt-5 h-10"
             onClick={onSignOut}
+            className="mt-5 inline-flex h-10 items-center rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             Sign out
-          </Button>
-        </AppSurface>
+          </button>
+        </div>
       </div>
     </PanelShell>
+  );
+}
+
+function PanelShell({
+  eyebrow,
+  title,
+  subtitle,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-8">
+      <div>
+        <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
+          {eyebrow}
+        </p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-950">
+          {title}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+      {children}
+    </div>
   );
 }

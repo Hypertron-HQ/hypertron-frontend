@@ -69,9 +69,11 @@ export type PaymentLinkStatus = "paid" | "pending" | "expired";
 
 export function getPaymentLinkStatus(link: {
   paidAt: string | null;
+  claimedAt?: string | null;
+  confirmedAt?: string | null;
   expiresAt: string | null;
 }): PaymentLinkStatus {
-  if (link.paidAt) return "paid";
+  if (link.paidAt || link.confirmedAt || link.claimedAt) return "paid";
   if (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) {
     return "expired";
   }
@@ -307,6 +309,64 @@ export async function getPublicPaymentLink(
         viewPub: json.viewPub ?? null,
         spendPub: json.spendPub ?? null,
       },
+    };
+  } catch {
+    return { ok: false, error: "Could not reach the API." };
+  }
+}
+
+/**
+ * On-demand Horizon reconcile for a Collect link. Marks classic payments paid
+ * when memo/amount/destination match, without waiting for the 30s scheduler.
+ */
+export async function checkPaymentLinkStatus(
+  id: string,
+  txHash?: string,
+): Promise<
+  | {
+      ok: true;
+      status: "paid" | "pending" | "expired";
+      paidAt: string | null;
+      paymentTxHash: string | null;
+    }
+  | { ok: false; error: string; expired?: boolean }
+> {
+  try {
+    const qs = txHash?.trim()
+      ? `?txHash=${encodeURIComponent(txHash.trim())}`
+      : "";
+    const url = `${getApiBaseUrl()}/api/payment-link/${encodeURIComponent(id)}/status${qs}`;
+    const res = await fetch(url, { method: "GET", credentials: "omit" });
+    const json = await readJson<{
+      status?: string;
+      paidAt?: string | Date | null;
+      paymentTxHash?: string | null;
+      error?: string;
+    }>(res);
+
+    if (res.status === 410 || json.status === "expired") {
+      return {
+        ok: false,
+        error: json.error ?? "This payment link has expired.",
+        expired: true,
+      };
+    }
+    if (!res.ok) {
+      return { ok: false, error: json.error ?? "Could not check payment status." };
+    }
+
+    const status =
+      json.status === "paid"
+        ? "paid"
+        : json.status === "expired"
+          ? "expired"
+          : "pending";
+
+    return {
+      ok: true,
+      status,
+      paidAt: json.paidAt ? String(json.paidAt) : null,
+      paymentTxHash: json.paymentTxHash ?? null,
     };
   } catch {
     return { ok: false, error: "Could not reach the API." };

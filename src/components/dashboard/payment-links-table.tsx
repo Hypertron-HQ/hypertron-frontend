@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CheckCheck,
   Copy,
@@ -8,34 +8,34 @@ import {
   LoaderCircle,
   RefreshCw,
 } from "lucide-react";
-import {
-  AppSurface,
-  EmptyState,
-  Money,
-  MonoId,
-  SectionLabel,
-  StatusBadge,
-  type StatusTone,
-} from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import {
+  checkPaymentLinkStatus,
   getPaymentLinkStatus,
   listPaymentLinks,
+  parsePrivateSettlement,
   type PaymentLinkListItem,
   type PaymentLinkStatus,
 } from "@/lib/payment-links";
-import { settleClaimedPaymentLinks } from "@/lib/settle-claimed-links";
+import { getStellarExpertTxUrl } from "@/lib/stellar-network";
+import { cn } from "@/lib/utils";
 
-const STATUS_TONE: Record<PaymentLinkStatus, StatusTone> = {
-  paid: "paid",
-  pending: "pending",
-  expired: "expired",
-};
-
-const STATUS_LABEL: Record<PaymentLinkStatus, string> = {
-  paid: "Paid",
-  pending: "Pending",
-  expired: "Expired",
+const STATUS_STYLES: Record<
+  PaymentLinkStatus,
+  { label: string; className: string }
+> = {
+  paid: {
+    label: "Paid",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  pending: {
+    label: "Pending",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  expired: {
+    label: "Expired",
+    className: "border-slate-200 bg-slate-100 text-slate-600",
+  },
 };
 
 function formatAmount(amount: string | null, currency: string) {
@@ -62,18 +62,16 @@ function shortId(id: string) {
 
 export function PaymentLinksTable({
   businessId,
-  walletAddress,
   refreshKey = 0,
 }: {
   businessId: string;
-  walletAddress?: string;
+  /** Bump after creating a link to refetch. */
   refreshKey?: number;
 }) {
   const [links, setLinks] = useState<PaymentLinkListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const settlingRef = useRef(false);
 
   const load = useCallback(async () => {
     const result = await listPaymentLinks(businessId);
@@ -83,40 +81,40 @@ export function PaymentLinksTable({
       setLoading(false);
       return;
     }
+
+    // Classic (non-private) pending links: nudge Horizon reconcile on refresh so
+    // status does not wait solely on the backend 30s scheduler.
+    const pendingClassic = result.links.filter((link) => {
+      if (getPaymentLinkStatus(link) !== "pending") return false;
+      return !parsePrivateSettlement(link.metadata);
+    });
+
+    if (pendingClassic.length > 0) {
+      await Promise.allSettled(
+        pendingClassic
+          .slice(0, 12)
+          .map((link) => checkPaymentLinkStatus(link.id)),
+      );
+      const refreshed = await listPaymentLinks(businessId);
+      if (refreshed.ok) {
+        setError(null);
+        setLinks(refreshed.links);
+        setLoading(false);
+        return;
+      }
+    }
+
     setError(null);
     setLinks(result.links);
     setLoading(false);
-
-    if (!walletAddress || settlingRef.current) return;
-    const needsConfirm = result.links.some(
-      (link) =>
-        link.claimedAt &&
-        link.claimOutCommitment &&
-        !link.paidAt &&
-        !link.confirmedAt,
-    );
-    if (!needsConfirm) return;
-
-    settlingRef.current = true;
-    try {
-      const settled = await settleClaimedPaymentLinks({
-        walletAddress,
-        links: result.links,
-      });
-      if (settled.confirmed === 0) return;
-
-      const again = await listPaymentLinks(businessId);
-      if (again.ok) setLinks(again.links);
-    } finally {
-      settlingRef.current = false;
-    }
-  }, [businessId, walletAddress]);
+  }, [businessId]);
 
   useEffect(() => {
     setLoading(true);
     void load();
   }, [load, refreshKey]);
 
+  // Light poll while any link is still unpaid/unexpired so Collect stays current.
   useEffect(() => {
     const hasPending = links.some(
       (link) => getPaymentLinkStatus(link) === "pending",
@@ -140,22 +138,24 @@ export function PaymentLinksTable({
   }
 
   return (
-    <AppSurface padded={false}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
         <div>
-          <SectionLabel>Records</SectionLabel>
-          <h2 className="mt-1 font-display text-base font-semibold tracking-tight text-foreground">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+            Workspace links
+          </p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-950">
             Payment links
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Status for every link in this workspace.
+          <p className="mt-0.5 text-sm text-slate-500">
+            All links for this workspace and their payment status.
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 gap-2"
+          className="h-9 gap-2 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
           onClick={() => {
             setLoading(true);
             void load();
@@ -172,22 +172,19 @@ export function PaymentLinksTable({
       </div>
 
       {error ? (
-        <div className="px-4 py-4 text-sm text-destructive sm:px-5">{error}</div>
+        <div className="px-4 py-4 text-sm text-rose-700 sm:px-5">{error}</div>
       ) : null}
 
       {loading && links.length === 0 ? (
-        <div className="flex items-center gap-2 px-4 py-10 text-sm text-muted-foreground sm:px-5">
+        <div className="flex items-center gap-2 px-4 py-10 text-sm text-slate-500 sm:px-5">
           <LoaderCircle className="size-4 animate-spin" />
           Loading payment links…
         </div>
       ) : null}
 
       {!loading && !error && links.length === 0 ? (
-        <div className="px-4 py-6 sm:px-5">
-          <EmptyState
-            title="No payment links yet"
-            description="Generate one above to see it here."
-          />
+        <div className="mx-4 my-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-400 sm:mx-5">
+          No payment links yet. Generate one above to see it here.
         </div>
       ) : null}
 
@@ -195,7 +192,7 @@ export function PaymentLinksTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+              <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] tracking-[0.08em] text-slate-400 uppercase">
                 <th className="px-4 py-3 font-semibold sm:px-5">Link</th>
                 <th className="px-3 py-3 font-semibold">Amount</th>
                 <th className="px-3 py-3 font-semibold">Customer</th>
@@ -207,46 +204,46 @@ export function PaymentLinksTable({
             <tbody>
               {links.map((link) => {
                 const status = getPaymentLinkStatus(link);
+                const style = STATUS_STYLES[status];
+                const txHash =
+                  link.paymentTxHash?.trim() || link.claimTxHash?.trim() || null;
+                const explorerUrl = txHash ? getStellarExpertTxUrl(txHash) : null;
                 return (
                   <tr
                     key={link.id}
-                    className="border-b border-border last:border-0"
+                    className="border-b border-slate-100 last:border-0"
                   >
                     <td className="px-4 py-3.5 sm:px-5">
-                      <p className="font-medium text-foreground">
+                      <p className="font-medium text-slate-900">
                         {link.purpose?.trim() || "Untitled link"}
                       </p>
-                      <p className="mt-0.5">
-                        <MonoId>
-                          {shortId(link.id)}
-                          {link.linkMemo ? ` · ${link.linkMemo}` : ""}
-                        </MonoId>
+                      <p className="mt-0.5 font-mono text-[11px] text-slate-400">
+                        {shortId(link.id)}
+                        {link.linkMemo ? ` · ${link.linkMemo}` : ""}
                       </p>
                     </td>
-                    <td className="px-3 py-3.5 whitespace-nowrap">
-                      <Money
-                        value={formatAmount(link.amount, link.currency).replace(
-                          ` ${link.currency}`,
-                          "",
-                        )}
-                        unit={link.currency}
-                        size="sm"
-                      />
+                    <td className="px-3 py-3.5 whitespace-nowrap font-medium text-slate-900">
+                      {formatAmount(link.amount, link.currency)}
                     </td>
-                    <td className="max-w-[160px] truncate px-3 py-3.5 text-muted-foreground">
+                    <td className="max-w-[160px] truncate px-3 py-3.5 text-slate-600">
                       {link.clientName?.trim() || "—"}
                     </td>
                     <td className="px-3 py-3.5">
-                      <StatusBadge tone={STATUS_TONE[status]}>
-                        {STATUS_LABEL[status]}
-                      </StatusBadge>
-                      {status === "paid" && link.paidAt ? (
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          {formatWhen(link.paidAt)}
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                          style.className,
+                        )}
+                      >
+                        {style.label}
+                      </span>
+                      {status === "paid" && (link.paidAt || link.claimedAt) ? (
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {formatWhen(link.paidAt || link.claimedAt)}
                         </p>
                       ) : null}
                     </td>
-                    <td className="px-3 py-3.5 whitespace-nowrap text-muted-foreground">
+                    <td className="px-3 py-3.5 whitespace-nowrap text-slate-500">
                       {formatWhen(link.createdAt)}
                     </td>
                     <td className="px-4 py-3.5 sm:px-5">
@@ -255,7 +252,7 @@ export function PaymentLinksTable({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1.5 px-2.5 text-xs"
+                          className="h-8 gap-1.5 rounded-xl border-slate-200 bg-white px-2.5 text-xs text-slate-700"
                           onClick={() => void copyUrl(link)}
                         >
                           {copiedId === link.id ? (
@@ -265,15 +262,25 @@ export function PaymentLinksTable({
                           )}
                           {copiedId === link.id ? "Copied" : "Copy"}
                         </Button>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:bg-muted"
-                        >
-                          Open
-                          <ExternalLink className="size-3.5" />
-                        </a>
+                        {explorerUrl ? (
+                          <a
+                            href={explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        ) : (
+                          <span
+                            title="Available after payment is confirmed"
+                            className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 text-xs font-medium text-slate-400"
+                          >
+                            Explorer
+                            <ExternalLink className="size-3.5" />
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -283,6 +290,6 @@ export function PaymentLinksTable({
           </table>
         </div>
       ) : null}
-    </AppSurface>
+    </div>
   );
 }

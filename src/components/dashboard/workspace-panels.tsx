@@ -1,26 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Loader2,
-  RefreshCw,
-  Shield,
-  Wallet,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import {
-  AppSurface,
-  EmptyState,
-  Money,
-  MonoId,
-  PanelShell,
-  SectionLabel,
-  StatusBadge,
-  WarningStrip,
-} from "@/components/dashboard/ui";
-import { Button } from "@/components/ui/button";
+import { Loader2, Shield, Wallet, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { WalletSession } from "@/lib/auth";
 import {
   updateBusinessProfile,
@@ -35,10 +16,12 @@ import {
 import {
   listNotes,
   updateNote,
+  type StoredNote,
 } from "@/lib/hypertron-note-store";
 import {
   listNotesV2,
   updateNoteV2,
+  type StoredNoteV2,
 } from "@/lib/hypertron-note-store-v2";
 import {
   fullScan,
@@ -52,89 +35,16 @@ import {
   buildUnshieldProof,
   computeNullifier,
 } from "@/lib/hypertron-prover";
-import {
-  deriveNoteSecrets,
-  deriveViewingKey,
-  deriveSpendKey,
-} from "@/lib/hypertron-viewkey";
-import type { Workspace } from "@/mockdata";
+import { deriveNoteSecrets, deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
+import { getWorkspaceTreasury, type Workspace } from "@/mockdata";
+import { fromBaseUnits } from "@/lib/stellar-network";
 
 export { WorkspacePayments } from "@/components/dashboard/workspace-payments";
+export { WorkspaceOverview } from "@/components/dashboard/workspace-overview";
 
-export function WorkspaceOverview({
-  workspace,
-  profile,
-}: {
-  workspace: Workspace;
-  profile?: BusinessProfile;
-}) {
-  const router = useRouter();
-  const privateReady = Boolean(
-    profile?.viewPub?.trim() && profile?.spendPub?.trim(),
-  );
-  const base = `/dashboard/w/${workspace.id}`;
+type NoteRow = StoredNote & { status: "pending" | "ready" | "spent" };
 
-  return (
-    <PanelShell
-      eyebrow="Workspace"
-      title="Overview"
-      subtitle={`${workspace.name} — collect, settle, and withdraw on Stellar.`}
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <AppSurface>
-          <SectionLabel>Next step</SectionLabel>
-          <p className="mt-2 text-sm font-semibold text-foreground">
-            Create a payment link
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Collect XLM, USDC, or EURC. Optional private settlement for XLM on
-            testnet.
-          </p>
-          <Button
-            type="button"
-            className="mt-4 gap-1.5"
-            onClick={() => router.push(`${base}?tab=payments`)}
-          >
-            Go to Payments
-            <ArrowRight className="size-4" />
-          </Button>
-        </AppSurface>
-
-        <AppSurface tone={privateReady ? "shielded" : "muted"}>
-          <SectionLabel>Private settlement</SectionLabel>
-          <div className="mt-2">
-            <StatusBadge tone={privateReady ? "shielded" : "neutral"}>
-              <Shield className="size-3" />
-              {privateReady ? "Enabled" : "Not enabled"}
-            </StatusBadge>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {privateReady
-              ? "Shielded notes appear in Treasury after a private link is paid."
-              : "Enable keys in Settings before creating private payment links."}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4"
-            onClick={() =>
-              router.push(
-                privateReady ? `${base}?tab=treasury` : `${base}?tab=settings`,
-              )
-            }
-          >
-            {privateReady ? "Open Treasury" : "Open Settings"}
-          </Button>
-        </AppSurface>
-      </div>
-
-      <EmptyState
-        title="No live activity feed yet"
-        description="Overview stays quiet until payment-link and note metrics are wired. Use Payments to collect and Treasury to withdraw."
-      />
-    </PanelShell>
-  );
-}
+type NoteRowV2 = StoredNoteV2 & { status: "pending" | "ready" | "spent" };
 
 type UnifiedNoteRow = {
   id: string;
@@ -160,6 +70,7 @@ export function WorkspaceTreasury({
   session: WalletSession;
   profile: BusinessProfile;
 }) {
+  const treasury = getWorkspaceTreasury(workspace.id);
   const [notes, setNotes] = useState<UnifiedNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -484,143 +395,215 @@ export function WorkspaceTreasury({
     }
   }
 
-  const readyTotal = notes
-    .filter((n) => n.status === "ready")
-    .reduce((sum, n) => sum + Number(n.amount || 0), 0);
-  const readyCount = notes.filter((n) => n.status === "ready").length;
+  const readyNotes = notes.filter((n) => n.status === "ready");
+  const readyTotal = readyNotes.reduce(
+    (sum, n) => sum + Number(n.amount || 0),
+    0,
+  );
 
   return (
-    <PanelShell
-      eyebrow="Balances"
-      title="Treasury"
-      subtitle="Shielded notes from private payment links, recovered in this browser."
-      actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void refresh()}
-          disabled={loading || scanState === "scanning"}
-        >
-          {scanState === "scanning" ? (
-            <>
-              <RefreshCw className="mr-1 size-3.5 animate-spin" />
-              Scanning…
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-1 size-3.5" />
-              Refresh
-            </>
-          )}
-        </Button>
-      }
-    >
-      <AppSurface tone="shielded">
-        <SectionLabel>Shielded · ready</SectionLabel>
-        <div className="mt-2">
-          <Money value={readyTotal.toFixed(2)} unit="XLM" size="lg" />
+    <div className="space-y-5">
+      <div>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#C9A46A] uppercase">
+          Balances
+        </p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-950">
+          Treasury
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Shielded notes from private payment links, plus mock vault balances.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-2xl border border-[#E7B66D]/70 bg-gradient-to-br from-[#FBF7F0] to-white px-5 py-5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-[#C9A46A] uppercase">
+              Shielded (ready)
+            </p>
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-[#4A63BE] text-white">
+              <Shield className="size-4" strokeWidth={1.9} />
+            </span>
+          </div>
+          <p className="mt-3 text-[28px] leading-none font-semibold tracking-tight text-slate-950">
+            {readyTotal.toFixed(2)} XLM
+          </p>
+          <p className="mt-2 text-xs font-medium text-slate-500">
+            {readyNotes.length} note(s) withdrawable
+          </p>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {readyCount} note{readyCount === 1 ? "" : "s"} withdrawable
-        </p>
-      </AppSurface>
+        {treasury.balances.map((balance) => (
+          <div
+            key={balance.asset}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-5"
+          >
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+              {balance.asset}
+            </p>
+            <p className="mt-3 text-[28px] leading-none font-semibold tracking-tight text-slate-950">
+              {balance.amount}
+            </p>
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              {balance.status}
+            </p>
+          </div>
+        ))}
+      </div>
 
-      <AppSurface>
-        <SectionLabel>Private notes</SectionLabel>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Stored locally; recovered via viewing key. Withdrawals require Freighter.
-        </p>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+              Private notes
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              Shielded history
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Stored in this browser; recovered via viewing key.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={loading || scanState === "scanning"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            {scanState === "scanning" ? (
+              <>
+                <RefreshCw className="size-3.5 animate-spin" />
+                Scanning…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="size-3.5" />
+                Refresh
+              </>
+            )}
+          </button>
+        </div>
 
-        {scanState === "indexer_down" ? (
-          <WarningStrip className="mt-3">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <span>Indexer unavailable. Some notes may not appear.</span>
-          </WarningStrip>
-        ) : null}
+        {scanState === "indexer_down" && (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+            <AlertTriangle className="size-4 shrink-0 text-amber-600" />
+            Indexer unavailable. Some notes may not appear.
+          </div>
+        )}
 
         {error ? (
-          <p className="mt-3 text-sm text-destructive" role="alert">
+          <p className="mt-4 text-sm text-rose-600" role="alert">
             {error}
           </p>
         ) : null}
         {status ? (
-          <p className="mt-2 text-xs text-muted-foreground">{status}</p>
+          <p className="mt-2 text-xs text-slate-500">{status}</p>
         ) : null}
 
         {loading ? (
-          <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+          <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
             <Loader2 className="size-4 animate-spin" />
             Loading notes…
           </p>
         ) : notes.length === 0 ? (
-          <EmptyState
-            className="mt-4"
-            title="No private notes yet"
-            description={
-              scanState === "empty"
-                ? "Create a private payment link or receive a private transfer."
-                : "Create a private payment link from Collect, then refresh after it is paid."
-            }
-          />
+          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center text-sm text-slate-500">
+            {scanState === "empty"
+              ? "No private notes yet. Create a private payment link or receive a private transfer."
+              : "No private notes yet. Create a private payment link from Collect."}
+          </div>
         ) : (
-          <ul className="mt-4 divide-y divide-border">
-            {notes.map((note) => (
-              <li
-                key={note.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Money value={note.amount} unit="XLM" size="sm" />
-                    <StatusBadge
-                      tone={
+          <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
+            <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_110px_minmax(140px,auto)] gap-2 border-b border-slate-100 bg-slate-50/80 px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase max-sm:hidden">
+              <span>Amount</span>
+              <span>Note</span>
+              <span>Status</span>
+              <span className="text-right">Action</span>
+            </div>
+            <ul>
+              {notes.map((note) => (
+                <li
+                  key={note.id}
+                  className="grid grid-cols-1 items-center gap-3 border-b border-slate-100 px-3.5 py-3.5 last:border-b-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_110px_minmax(140px,auto)] sm:gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {note.amount} XLM
+                    </p>
+                    <p className="mt-0.5 text-xs capitalize text-slate-400 sm:hidden">
+                      {note.origin} · leaf {note.leafIndex ?? "—"}
+                    </p>
+                  </div>
+                  <div className="min-w-0 max-sm:hidden">
+                    <p className="truncate font-mono text-[12px] text-slate-600">
+                      {note.id.slice(0, 10)}…
+                    </p>
+                    <p className="mt-0.5 text-xs capitalize text-slate-400">
+                      {note.origin} · leaf {note.leafIndex ?? "—"}
+                    </p>
+                  </div>
+                  <NoteStatusPill status={note.status} />
+                  <div className="sm:justify-self-end">
+                    <button
+                      type="button"
+                      disabled={note.status !== "ready" || busyId === note.id}
+                      onClick={() => void handleWithdraw(note)}
+                      className={
                         note.status === "ready"
-                          ? "shielded"
-                          : note.status === "spent"
-                            ? "spent"
-                            : "pending"
+                          ? "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#121F46] to-[#4A63BE] px-3.5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(18,31,70,0.18)] transition hover:brightness-110 disabled:opacity-60"
+                          : "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-medium text-slate-500 disabled:opacity-80"
                       }
                     >
-                      {note.status}
-                    </StatusBadge>
+                      {busyId === note.id ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Working…
+                        </>
+                      ) : note.status === "spent" ? (
+                        "Spent"
+                      ) : note.status === "pending" ? (
+                        "Awaiting confirmation"
+                      ) : (
+                        <>
+                          <Wallet className="size-3.5" />
+                          Withdraw
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <MonoId title={note.id}>{note.id.slice(0, 10)}…</MonoId>
-                    <span>·</span>
-                    <span className="capitalize">{note.origin}</span>
-                    <span>·</span>
-                    <span>leaf {note.leafIndex ?? "—"}</span>
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={note.status !== "ready" || busyId === note.id}
-                  onClick={() => void handleWithdraw(note)}
-                >
-                  {busyId === note.id ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Working…
-                    </>
-                  ) : note.status === "spent" ? (
-                    "Spent"
-                  ) : note.status === "pending" ? (
-                    "Awaiting confirmation"
-                  ) : (
-                    <>
-                      <Wallet className="size-3.5" />
-                      Withdraw
-                    </>
-                  )}
-                </Button>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-      </AppSurface>
-    </PanelShell>
+      </div>
+    </div>
+  );
+}
+
+function NoteStatusPill({
+  status,
+}: {
+  status: "pending" | "ready" | "spent";
+}) {
+  if (status === "ready") {
+    return (
+      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+        <CheckCircle2 className="size-3" strokeWidth={2.4} />
+        Ready
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+        <Loader2 className="size-3" strokeWidth={2.4} />
+        Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex w-fit items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+      Spent
+    </span>
   );
 }
 
@@ -702,150 +685,220 @@ export function WorkspaceSettingsPanel({
   }
 
   return (
-    <PanelShell
-      eyebrow="Workspace"
-      title="Settings"
-      subtitle="Private settlement keys and workspace identity."
-    >
-      <div className="max-w-lg space-y-3">
-        <AppSurface>
-          <SectionLabel>Workspace</SectionLabel>
-          <p className="mt-2 text-sm font-semibold text-foreground">
-            {workspace.name}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Owner · Freighter-linked
-          </p>
-        </AppSurface>
+    <div className="space-y-5">
+      <div>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#C9A46A] uppercase">
+          Workspace
+        </p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-950">
+          Settings
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Name, members, and private settlement for this workspace.
+        </p>
+      </div>
 
-        <AppSurface tone="shielded">
+      <div className="grid max-w-3xl gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+                Workspace profile
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-950">
+                {workspace.name}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {workspace.tier} · {workspace.members} member
+                {workspace.members === 1 ? "" : "s"} · Role {workspace.role}
+              </p>
+            </div>
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#4A63BE] text-sm font-semibold text-white">
+              {workspace.initial || workspace.name.slice(0, 1).toUpperCase()}
+            </span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+            <span className="rounded-full border border-[#E7B66D]/40 bg-[#FBF7F0] px-2.5 py-1 text-[11px] font-semibold text-[#0F1939]">
+              {workspace.tier}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+              {workspace.role}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+              {workspace.members} member{workspace.members === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#E7B66D]/55 bg-[#FBF7F0] p-5 lg:col-span-2">
           <div className="flex items-start gap-3">
-            <Shield className="mt-0.5 size-5 shrink-0" />
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#4A63BE] text-white">
+              <Shield className="size-5" strokeWidth={1.9} />
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">
-                Private settlement
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
+                  Private settlement
+                </p>
+                {profile.viewPub?.trim() && profile.spendPub?.trim() ? (
+                  <span className="rounded-md bg-[#4A63BE] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
+                    Enabled
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-[#0F1939] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#E7B66D] uppercase">
+                    Required
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-base font-semibold text-slate-900">
+                Freighter-backed viewing &amp; spend keys
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Derive viewing and spend keys from Freighter and publish only
-                the public halves. Secrets never leave this browser.
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                Derive viewing and spend keys from your Freighter wallet and
+                publish only the public halves. Secrets never leave this
+                browser. Auditors can decrypt with the viewing secret but cannot
+                spend.
               </p>
+
               {profile.viewPub?.trim() && profile.spendPub?.trim() ? (
-                <p className="mt-2 break-all dash-mono text-[11px] text-muted-foreground">
-                  viewPub {profile.viewPub.slice(0, 18)}… · spendPub{" "}
-                  {profile.spendPub.slice(0, 18)}…
-                </p>
+                <div className="mt-3 rounded-xl border border-[#E7B66D]/30 bg-white/90 px-3.5 py-3">
+                  <p className="break-all font-mono text-[11px] text-slate-600">
+                    viewPub {profile.viewPub.slice(0, 18)}… · spendPub{" "}
+                    {profile.spendPub.slice(0, 18)}…
+                  </p>
+                </div>
               ) : (
-                <p className="mt-2 text-xs font-medium">
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/80 px-3.5 py-3 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   Not enabled yet — required before creating private links.
-                </p>
+                </div>
               )}
+
               {error ? (
-                <p className="mt-2 text-sm text-destructive" role="alert">
+                <p className="mt-3 text-sm text-rose-600" role="alert">
                   {error}
                 </p>
               ) : null}
               {message ? (
-                <p className="mt-2 text-sm text-blue-800">{message}</p>
+                <p className="mt-3 text-sm font-medium text-emerald-700">
+                  {message}
+                </p>
               ) : null}
-              <Button
+
+              <button
                 type="button"
-                className="mt-4"
                 disabled={enabling}
                 onClick={() => void enablePrivateSettlement()}
+                className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#121F46] to-[#4A63BE] px-5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
               >
-                {enabling
-                  ? "Signing…"
-                  : profile.viewPub?.trim() && profile.spendPub?.trim()
-                    ? "Rotate / re-enable"
-                    : "Enable private settlement"}
-              </Button>
+                {enabling ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Signing…
+                  </>
+                ) : profile.viewPub?.trim() && profile.spendPub?.trim() ? (
+                  "Rotate / re-enable"
+                ) : (
+                  "Enable private settlement"
+                )}
+              </button>
             </div>
           </div>
-        </AppSurface>
+        </div>
 
         {profile.viewPub?.trim() ? (
-          <AppSurface>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-2">
             <div className="flex items-start gap-3">
-              <Shield className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#FBF7F0] text-[#C9A46A]">
+                <Shield className="size-5" strokeWidth={1.9} />
+              </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">
+                <p className="text-[11px] font-semibold tracking-[0.14em] text-[#C9A46A] uppercase">
                   Auditor disclosure
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Share the viewing secret only with auditors you trust. It
-                  decrypts amounts but cannot spend.
+                <p className="mt-1 text-base font-semibold text-slate-900">
+                  Share decrypt access carefully
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                  Share the viewing <span className="font-medium">secret</span>{" "}
+                  only with auditors you trust. It decrypts private payment
+                  amounts but cannot spend — spending requires the separate
+                  spend key, which stays in this browser.
                 </p>
 
                 <div className="mt-4 space-y-3">
-                  <div>
-                    <SectionLabel>Viewing public key</SectionLabel>
-                    <div className="mt-1 flex items-center gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-2 py-1 dash-mono text-[11px] text-foreground">
+                  <div className="rounded-xl border border-slate-200 bg-[#F8F9FC] px-3.5 py-3">
+                    <p className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
+                      Viewing public key (safe to share)
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <code className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-700">
                         {profile.viewPub}
                       </code>
-                      <Button
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
                         onClick={() =>
                           void copyToClipboard(profile.viewPub!, "pub")
                         }
+                        className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         {copiedPub ? "Copied" : "Copy"}
-                      </Button>
+                      </button>
                     </div>
                   </div>
 
-                  <div className="border-t border-border pt-3">
-                    <SectionLabel>Viewing secret</SectionLabel>
-                    <p className="mt-1 text-xs text-[color:var(--shielded-foreground)]">
-                      Decrypts notes; cannot withdraw. Prefer a redacted audit
-                      export when possible.
+                  <div className="rounded-xl border border-[#E7B66D]/40 bg-[#FBF7F0] px-3.5 py-3">
+                    <p className="text-[11px] font-semibold tracking-[0.08em] text-[#C9A46A] uppercase">
+                      Viewing secret (decrypts amounts — cannot spend)
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                      Anyone with this secret can decrypt notes addressed to
+                      you, but cannot withdraw or transfer them. Prefer
+                      exporting a redacted audit report when possible.
                     </p>
                     {showSecret && viewSecret ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded-lg bg-[color:var(--shielded)] px-2 py-1 dash-mono text-[11px] text-foreground">
+                        <code className="min-w-0 flex-1 truncate rounded-lg border border-[#E7B66D]/30 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-700">
                           {viewSecret}
                         </code>
-                        <Button
+                        <button
                           type="button"
-                          variant="outline"
-                          size="sm"
                           onClick={() =>
                             void copyToClipboard(viewSecret, "secret")
                           }
+                          className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                         >
                           {copiedSecret ? "Copied" : "Copy"}
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
                           onClick={() => {
                             setShowSecret(false);
                             setViewSecret(null);
                           }}
+                          className="inline-flex h-9 items-center rounded-xl px-3 text-xs font-semibold text-slate-500 transition hover:bg-white/70"
                         >
                           Hide
-                        </Button>
+                        </button>
                       </div>
                     ) : (
-                      <Button
+                      <button
                         type="button"
-                        variant="outline"
-                        className="mt-2"
                         onClick={() => void revealViewSecret()}
+                        className="mt-3 inline-flex h-10 items-center rounded-xl border border-[#E7B66D]/50 bg-white px-4 text-sm font-semibold text-[#0F1939] transition hover:bg-[#F8F0E2]"
                       >
                         Reveal secret (requires signature)
-                      </Button>
+                      </button>
                     )}
                   </div>
                 </div>
               </div>
             </div>
-          </AppSurface>
+          </div>
         ) : null}
       </div>
-    </PanelShell>
+    </div>
   );
 }
+
+

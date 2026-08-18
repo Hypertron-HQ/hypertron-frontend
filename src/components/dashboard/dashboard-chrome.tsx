@@ -1,19 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Menu, ShieldUser } from "lucide-react";
-import { HypertronLogoMark } from "@/components/dashboard/hypertron-logo-mark";
-import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+  Bell,
+  ChevronsUpDown,
+  CircleHelp,
+  Search,
+  ShieldUser,
+} from "lucide-react";
+import type { ReactNode } from "react";
+import { HypertronLogoMark } from "@/components/dashboard/hypertron-logo-mark";
 
 export type DashboardNavItem = {
   id: string;
@@ -28,110 +25,12 @@ export type DashboardIdentity = {
   subtitle?: string;
 };
 
-function shortenWallet(address: string) {
-  if (address.length < 12) return address;
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
-}
-
-function NavList({
-  navItems,
-  activeId,
-  onSelect,
-}: {
-  navItems: DashboardNavItem[];
-  activeId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <nav className="flex flex-1 flex-col gap-0.5">
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const active = activeId === item.id;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onSelect(item.id)}
-            className={cn(
-              "flex h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium transition",
-              active
-                ? "bg-blue/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.45)]"
-                : "text-white/65 hover:bg-white/[0.05] hover:text-white",
-            )}
-          >
-            <Icon className="size-4 shrink-0" strokeWidth={1.85} />
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function IdentityCard({ identity }: { identity?: DashboardIdentity }) {
-  const identityTitle = identity?.title ?? "Not signed in";
-  return (
-    <Link
-      href="/dashboard?tab=settings"
-      className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-left transition hover:bg-white/[0.1]"
-    >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.08] text-white ring-1 ring-white/10">
-        <ShieldUser className="size-4" strokeWidth={1.75} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">
-          {identityTitle}
-        </p>
-        {identity?.subtitle ? (
-          <p
-            className="dash-mono truncate text-[11px] text-white/45"
-            title={identity.subtitle}
-          >
-            {shortenWallet(identity.subtitle)}
-          </p>
-        ) : null}
-      </div>
-    </Link>
-  );
-}
-
-function SidebarBody({
-  navItems,
-  activeId,
-  onSelect,
-  identity,
-}: {
-  navItems: DashboardNavItem[];
-  activeId: string;
-  onSelect: (id: string) => void;
-  identity?: DashboardIdentity;
-}) {
-  return (
-    <>
-      <Link href="/dashboard" className="flex items-center gap-2.5 px-1">
-        <HypertronLogoMark size={28} />
-        <span className="font-display text-[15px] font-semibold tracking-tight text-white">
-          Hypertron
-        </span>
-      </Link>
-
-      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-6">
-        <NavList
-          navItems={navItems}
-          activeId={activeId}
-          onSelect={onSelect}
-        />
-        <IdentityCard identity={identity} />
-      </div>
-    </>
-  );
-}
-
 export function DashboardChrome({
   navItems,
   activeId,
   onSelect,
   breadcrumb,
+  searchPlaceholder,
   identity,
   children,
 }: {
@@ -139,86 +38,167 @@ export function DashboardChrome({
   activeId: string;
   onSelect: (id: string) => void;
   breadcrumb: string;
-  /** @deprecated kept for call-site compatibility; unused */
-  searchPlaceholder?: string;
+  searchPlaceholder: string;
   identity?: DashboardIdentity;
   children: ReactNode;
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  function handleSelect(id: string) {
-    onSelect(id);
-    setMobileOpen(false);
-  }
-
+  const identityTitle = identity?.title ?? "Not signed in";
   return (
-    <div className="relative min-h-svh bg-navy text-white">
+    <div className="relative min-h-svh overflow-hidden bg-[#0F1939] text-white">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_20%_-10%,rgba(59,130,246,0.16),transparent_55%),linear-gradient(180deg,#070b14_0%,#030712_100%)]"
+        className="pointer-events-none absolute -top-24 left-[8%] size-[28rem] rounded-full bg-[#E7B66D]/12 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-[18%] -left-24 size-[22rem] rounded-full border border-[#E7B66D]/15"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[8%] bottom-[-8rem] size-[32rem] rounded-full bg-[#4A63BE]/18 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[18%] top-[12%] size-[18rem] rounded-full border border-white/8"
       />
 
-      <div className="relative z-10 flex min-h-svh gap-0 md:gap-3 md:p-3">
-        <aside className="hidden w-[220px] shrink-0 flex-col py-4 pl-3 md:flex">
-          <SidebarBody
-            navItems={navItems}
-            activeId={activeId}
-            onSelect={handleSelect}
-            identity={identity}
-          />
-        </aside>
+      <div className="relative z-10 flex min-h-svh gap-3 p-3 md:gap-4 md:p-4">
+        <aside className="flex w-[220px] shrink-0 flex-col py-2 pb-10 pl-1">
+          <Link href="/dashboard" className="flex items-center gap-2.5 px-3 pt-2">
+            <HypertronLogoMark size={32} />
+            <span className="font-display text-[15px] font-semibold tracking-tight text-white">
+              Hypertron
+            </span>
+          </Link>
 
-        <section className="surface-light flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground md:min-h-0 md:rounded-2xl md:border md:border-white/10">
-          <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-6">
-            <div className="flex min-w-0 items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="md:hidden"
-                aria-label="Open navigation"
-                onClick={() => setMobileOpen(true)}
-              >
-                <Menu className="size-4" />
-              </Button>
-              <p className="truncate text-sm text-muted-foreground">
-                {breadcrumb}
-              </p>
-            </div>
+          <div className="mt-5 px-3">
+            <label className="relative flex h-10 items-center rounded-full border border-white/10 bg-white/[0.06]">
+              <Search
+                className="pointer-events-none absolute left-3.5 size-4 text-white/45"
+                strokeWidth={1.75}
+              />
+              <input
+                type="search"
+                placeholder="Search"
+                className="h-full w-full rounded-full bg-transparent pr-10 pl-10 text-sm text-white placeholder:text-white/40 focus:outline-none"
+              />
+              <kbd className="pointer-events-none absolute right-2 flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-1.5 text-[11px] font-medium text-white/40">
+                /
+              </kbd>
+            </label>
+          </div>
+
+          <nav className="mt-5 flex flex-1 flex-col gap-1 px-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = activeId === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className={[
+                    "relative flex h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium transition",
+                    active
+                      ? "bg-gradient-to-r from-[#E7B66D]/22 via-[#E7B66D]/10 to-transparent text-white shadow-[inset_0_0_0_1px_rgba(231,182,109,0.28)]"
+                      : "text-white/55 hover:bg-white/[0.05] hover:text-white",
+                  ].join(" ")}
+                >
+                  {active ? (
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-[#E7B66D] shadow-[0_0_12px_rgba(231,182,109,0.65)]"
+                    />
+                  ) : null}
+                  <Icon
+                    className={[
+                      "size-4 shrink-0",
+                      active ? "text-[#E7B66D]" : "text-white/45",
+                    ].join(" ")}
+                    strokeWidth={1.85}
+                  />
+                  <span className={active ? "text-white" : undefined}>
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="space-y-3 px-2">
+            <button
+              type="button"
+              className="flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm font-medium text-white transition hover:bg-white/[0.05]"
+            >
+              <CircleHelp
+                className="size-4 text-[#E7B66D]"
+                strokeWidth={1.85}
+              />
+              Help &amp; Support
+            </button>
+
             <Link
               href="/dashboard"
-              className="hidden text-xs font-medium text-muted-foreground transition hover:text-foreground sm:inline"
+              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3.5 text-left shadow-[inset_0_0_0_1px_rgba(231,182,109,0.08)] transition hover:bg-white/[0.09]"
             >
-              Account hub
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#4A63BE]/25 text-[#E7B66D] ring-1 ring-[#E7B66D]/25">
+                <ShieldUser className="size-5" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-white">
+                  {identityTitle}
+                </p>
+                {identity?.subtitle ? (
+                  <p
+                    className="truncate font-mono text-xs text-white/45"
+                    title={identity.subtitle}
+                  >
+                    {identity.subtitle}
+                  </p>
+                ) : null}
+              </div>
+              <ChevronsUpDown
+                className="size-4 shrink-0 text-[#E7B66D]"
+                strokeWidth={2}
+              />
             </Link>
+          </div>
+        </aside>
+
+        <section className="surface-light flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-background text-foreground shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+          <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-5 md:px-6">
+            <p className="text-sm text-slate-400">{breadcrumb}</p>
+            <div className="flex items-center gap-2">
+              <label className="relative hidden h-9 w-56 items-center rounded-full border border-slate-200 bg-slate-50 sm:flex">
+                <Search
+                  className="pointer-events-none absolute left-3 size-3.5 text-slate-400"
+                  strokeWidth={1.75}
+                />
+                <input
+                  type="search"
+                  placeholder={searchPlaceholder}
+                  className="h-full w-full rounded-full bg-transparent pr-9 pl-9 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                />
+                <kbd className="pointer-events-none absolute right-2 flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1 text-[10px] font-medium text-slate-400">
+                  /
+                </kbd>
+              </label>
+              <button
+                type="button"
+                aria-label="Notifications"
+                className="relative inline-flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+              >
+                <Bell className="size-4" />
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-red-500 ring-2 ring-white" />
+              </button>
+            </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-7 md:py-7">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-7 md:py-7">
             {children}
           </div>
         </section>
       </div>
-
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
-          side="left"
-          className="w-[280px] border-white/10 bg-navy p-4 text-white sm:max-w-[280px]"
-          showCloseButton
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>Dashboard sections</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full flex-col pt-2">
-            <SidebarBody
-              navItems={navItems}
-              activeId={activeId}
-              onSelect={handleSelect}
-              identity={identity}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

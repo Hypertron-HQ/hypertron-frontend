@@ -2,12 +2,14 @@ export type WorkspaceTab =
   | "overview"
   | "payments"
   | "treasury"
+  | "developers"
   | "settings";
 
 export const WORKSPACE_TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "payments", label: "Payments" },
   { id: "treasury", label: "Treasury" },
+  { id: "developers", label: "Developers" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -18,6 +20,7 @@ export function isWorkspaceTab(
     value === "overview" ||
     value === "payments" ||
     value === "treasury" ||
+    value === "developers" ||
     value === "settings"
   );
 }
