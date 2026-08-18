@@ -185,7 +185,7 @@ export function selectNotesForAmount(
     .slice()
     .sort((a, b) => {
       const d = BigInt(a.amountBaseUnits) - BigInt(b.amountBaseUnits);
-      return d < 0n ? -1 : d > 0n ? 1 : 0;
+      return d < BigInt(0) ? -1 : d > BigInt(0) ? 1 : 0;
     });
 
   const value = (n: StoredNoteV2) => BigInt(n.amountBaseUnits);
