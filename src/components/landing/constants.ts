@@ -38,9 +38,8 @@ export const WAYS = [
     copy: "The pool is a permissionless contract. Your app deposits, transfers, and unshields against the same Merkle tree Hypertron merchants use — no dashboard, no new anonymity set.",
     audience: "For protocol and infrastructure developers",
     tags: ["Pool contract", "Cross-contract ABI", "Shared anonymity set", "Open prover"],
-    href: "https://github.com/Hypertron-HQ/hypertron-contracts/blob/main/docs/ARCHITECTURE.md",
+    href: "/docs/protocol",
     cta: "Read the protocol",
-    external: true,
   },
   {
     title: "Use the API",
@@ -48,7 +47,7 @@ export const WAYS = [
     copy: "Add Hypertron-powered payment flows through an API designed for Stripe-like integration.",
     audience: "For application developers",
     tags: ["Payment API", "Checkout", "Webhooks", "Settlement status"],
-    href: "/docs#quickstart",
+    href: "/docs/api",
     cta: "Read the docs",
   },
 ] as const;
@@ -172,7 +171,7 @@ export const FAQS = [
     answer: [
       "Hypertron is built on the Stellar network and is designed around Stellar assets and Soroban smart contracts. Current supported assets, payment methods, and environments are listed in the documentation.",
     ],
-    link: { href: "/docs#environments", label: "View supported assets" },
+    link: { href: "/docs/api#environments", label: "View supported assets" },
   },
   {
     question: "Is Hypertron live?",

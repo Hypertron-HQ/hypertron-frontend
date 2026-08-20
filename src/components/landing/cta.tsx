@@ -31,7 +31,7 @@ export function LandingCta() {
                 />
                 <div className="flex flex-wrap gap-3">
                   <a
-                    href="/docs#quickstart"
+                    href="/docs/api"
                     className="inline-flex h-11 items-center gap-2 border border-[#c5cedb] px-5 text-[11px] font-medium tracking-[0.15em] text-[#1c2433] uppercase transition hover:border-[#1c2433] hover:text-[#0d1220]"
                   >
                     Read API docs
