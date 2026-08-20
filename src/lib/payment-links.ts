@@ -1,5 +1,6 @@
 import { apiFetch, getApiBaseUrl } from "@/lib/api";
 import { getDeveloperApiBaseUrl } from "@/lib/developer-api";
+import { toPublicPaymentLinkUrl } from "@/lib/payment-link-public-url";
 
 export type PaymentLinkCreated = {
   linkId: string;
@@ -168,7 +169,17 @@ export async function createPaymentLink(input: {
         error: json.error ?? "Could not create payment link.",
       };
     }
-    return { ok: true, link: json };
+    return {
+      ok: true,
+      link: {
+        ...json,
+        url: toPublicPaymentLinkUrl(json.url, json.linkId),
+        qrPayload: toPublicPaymentLinkUrl(
+          json.qrPayload || json.url,
+          json.linkId,
+        ),
+      },
+    };
   } catch {
     return { ok: false, error: "Could not reach the API." };
   }
@@ -220,7 +231,7 @@ export async function listPaymentLinks(
         claimOutCommitment: link.claimOutCommitment ?? null,
         confirmedAt: link.confirmedAt ?? null,
         createdAt: link.createdAt,
-        url: link.url,
+        url: toPublicPaymentLinkUrl(link.url, link.id),
         shieldSalt: link.shieldSalt ?? null,
         shieldCommitment: link.shieldCommitment ?? null,
         shieldProof: link.shieldProof ?? null,

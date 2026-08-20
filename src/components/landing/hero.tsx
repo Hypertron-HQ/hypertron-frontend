@@ -220,8 +220,18 @@ export function LandingHero() {
               }
             >
             <video
+              className="landing-hero-video-fill"
+              src={HERO_VIDEO}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              aria-hidden
+            />
+            <video
               ref={videoRef}
-              className="absolute inset-0 size-full object-cover"
+              className="landing-hero-video"
               src={HERO_VIDEO}
               autoPlay
               muted

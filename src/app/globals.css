@@ -470,6 +470,61 @@ body {
   inset: 0;
 }
 
+.landing-hero-video,
+.landing-hero-video-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.landing-hero-video-fill {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .landing-hero-frame,
+  .landing-hero-scene {
+    background:
+      radial-gradient(ellipse 120% 70% at 50% 100%, #1d4e8c 0%, transparent 58%),
+      linear-gradient(180deg, #030712 0%, #071428 38%, #0c2c5c 68%, #163e78 100%);
+  }
+
+  .landing-hero-video-fill {
+    display: block;
+    object-position: 0% 80%;
+  }
+
+  .landing-hero-video {
+    inset: auto;
+    left: 0;
+    right: 0;
+    top: 60%;
+    z-index: 1;
+    width: 100%;
+    height: min(66vh, 36rem);
+    transform: translateY(-50%);
+    object-fit: cover;
+    object-position: 74% 46%;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 14%,
+      #000 88%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 14%,
+      #000 88%,
+      transparent 100%
+    );
+  }
+}
+
 .landing-hero-title {
   font-family: "Aeonik Pro", sans-serif;
 }
@@ -514,6 +569,19 @@ body {
       transparent 28%,
       rgba(5, 7, 12, 0.55) 100%
     );
+}
+
+@media (max-width: 767px) {
+  .landing-hero-veil {
+    background: linear-gradient(
+      180deg,
+      rgba(5, 7, 12, 0.62) 0%,
+      rgba(5, 7, 12, 0.28) 26%,
+      rgba(5, 7, 12, 0.06) 48%,
+      rgba(5, 7, 12, 0.22) 72%,
+      rgba(5, 7, 12, 0.7) 100%
+    );
+  }
 }
 
 .landing-nav {
