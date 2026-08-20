@@ -19,6 +19,21 @@ export const metadata: Metadata = {
   title: "Hypertron: Privacy infrastructure for Payments",
   description:
     "A shielded pool on Stellar for private payments: protocol, API, and workspace on one settlement rail.",
+  icons: {
+    icon: [
+      {
+        url: "/media/logo_black.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/media/logo_white.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    apple: "/media/logo_black.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

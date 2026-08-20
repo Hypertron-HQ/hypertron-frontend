@@ -12,7 +12,6 @@ import {
 import { DocsShell, SectionHeading } from "@/components/docs/docs-shell";
 
 export const metadata: Metadata = {
-  title: "Documentation — Hypertron",
   description:
     "Hypertron is a privacy interface on Stellar — protocol, API, and platform on one settlement rail.",
 };
