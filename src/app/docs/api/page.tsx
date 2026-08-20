@@ -10,7 +10,6 @@ import {
 import { getDeveloperApiBaseUrl } from "@/lib/developer-api";
 
 export const metadata: Metadata = {
-  title: "Payments API — Hypertron Docs",
   description:
     "Create hosted checkout, follow payment state, and receive signed webhooks. The API is a consumer of the Hypertron shielded pool.",
 };

@@ -16,9 +16,24 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Hypertron — B2B operations & payments on Stellar",
+  title: "Hypertron: Privacy infrastructure for Payments",
   description:
-    "Create onboarding flows, collect payments, automate approvals, and settle funds privately across global teams.",
+    "A shielded pool on Stellar for private payments: protocol, API, and workspace on one settlement rail.",
+  icons: {
+    icon: [
+      {
+        url: "/media/logo_black.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/media/logo_white.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    apple: "/media/logo_black.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

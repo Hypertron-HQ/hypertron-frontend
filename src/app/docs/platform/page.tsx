@@ -8,7 +8,6 @@ import {
 } from "@/components/docs/docs-shell";
 
 export const metadata: Metadata = {
-  title: "Platform — Hypertron Docs",
   description:
     "The Hypertron workspace: payment links, treasury, settlement, and viewing-key disclosure on the same shielded pool.",
 };

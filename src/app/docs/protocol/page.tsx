@@ -9,7 +9,6 @@ import {
 } from "@/components/docs/docs-shell";
 
 export const metadata: Metadata = {
-  title: "Privacy protocol — Hypertron Docs",
   description:
     "Technical specification of the Hypertron shielded pool: Groth16 over BLS12-381, Poseidon notes, TransferNCircuit, and the live testnet deployment.",
 };
