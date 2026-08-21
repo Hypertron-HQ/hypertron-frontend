@@ -48,14 +48,24 @@ import {
   fromBaseUnits,
 } from "@/lib/stellar-network";
 import { cn } from "@/lib/utils";
-import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
-import { buildTransferProof, buildTransferNProof } from "@/lib/hypertron-prover";
-import { getPoolLeaves, getPoolCommitments } from "@/lib/hypertron-indexer";
+import {
+  deriveViewingKey,
+  deriveSpendKey,
+  deriveNoteSecrets,
+  randomSaltHex,
+} from "@/lib/hypertron-viewkey";
+import {
+  buildDepositProof,
+  buildTransferProof,
+  buildTransferNProof,
+} from "@/lib/hypertron-prover";
+import { getPoolLeaves } from "@/lib/hypertron-indexer";
 import {
   listUnspentNotesV2,
   putNoteV2,
   markNoteSpent,
   selectNotesForAmount,
+  getWalletBalance,
   type StoredNoteV2,
 } from "@/lib/hypertron-note-store-v2";
 import { fullScan } from "@/lib/hypertron-note-scan";
@@ -68,6 +78,42 @@ const BRAND_FEATURES = [
   { icon: Shield, title: "Secure", desc: "On Stellar Network" },
   { icon: Lock, title: "Private", desc: "Opt-in private settlement" },
 ] as const;
+
+const TOKEN_LOGOS: Record<string, string> = {
+  XLM: "https://coin-images.coingecko.com/coins/images/100/small/fmpFRHHQ_400x400.jpg",
+  USDC: "https://coin-images.coingecko.com/coins/images/6319/small/USDC.png",
+  EURC: "https://coin-images.coingecko.com/coins/images/26045/small/EURC.png",
+};
+
+function TokenMark({
+  currency,
+  className,
+}: {
+  currency: string;
+  className?: string;
+}) {
+  const src = TOKEN_LOGOS[currency.toUpperCase()];
+  if (!src) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center justify-center rounded-lg bg-[#4A63BE] text-[11px] font-bold text-white",
+          className,
+        )}
+      >
+        {currency.slice(0, 1)}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={currency}
+      className={cn("shrink-0 rounded-full object-cover", className)}
+    />
+  );
+}
 
 function splitPaymentDescription(description: string) {
   const trimmed = description.trim();
@@ -100,6 +146,7 @@ export function PaymentCheckout({ linkId }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState<"hash" | "address" | "link" | null>(null);
   const [viewSecret, setViewSecret] = useState<string | null>(null);
   const [viewPub, setViewPub] = useState<string | null>(null);
@@ -110,6 +157,10 @@ export function PaymentCheckout({ linkId }: Props) {
   );
   const [notePickError, setNotePickError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [shieldedDisplay, setShieldedDisplay] = useState<string | null>(null);
+  const [shieldedNoteCount, setShieldedNoteCount] = useState(0);
+  const [pendingNoteCount, setPendingNoteCount] = useState(0);
+  const [depositAmount, setDepositAmount] = useState("");
   const [payPageUrl, setPayPageUrl] = useState("");
   const [activeTab, setActiveTab] = useState<PayTab>("wallet");
   const [kycName, setKycName] = useState("");
@@ -138,6 +189,9 @@ export function PaymentCheckout({ linkId }: Props) {
         return;
       }
       setLink(result.link);
+      if (result.link.amount) {
+        setDepositAmount((current) => current || result.link.amount!);
+      }
       if (result.link.paymentTxHash) {
         setTxHash(result.link.paymentTxHash);
       }
@@ -179,18 +233,64 @@ export function PaymentCheckout({ linkId }: Props) {
     return () => window.clearInterval(id);
   }, [link, linkId, txHash]);
 
-  const checkForSpendableNote = useCallback(
+  const refreshShieldedState = useCallback(
     async (
       walletAddr: string,
       secret: string,
       spendSk: string,
       amountNeeded: string,
-    ) => {
+    ): Promise<boolean> => {
       setScanning(true);
       try {
         await fullScan(walletAddr, secret, spendSk);
-        const unspent = await listUnspentNotesV2(walletAddr);
+        const [unspent, balance] = await Promise.all([
+          listUnspentNotesV2(walletAddr),
+          getWalletBalance(walletAddr),
+        ]);
+        setShieldedDisplay(fromBaseUnits(balance.spendableBaseUnits));
+        setShieldedNoteCount(balance.spendableCount);
+        setPendingNoteCount(
+          unspent.filter((note) => note.leafIndex == null).length,
+        );
+
+        if (!amountNeeded) {
+          setSpendableNotes(null);
+          setNotePickError(null);
+          return false;
+        }
+
         const pick = selectNotesForAmount(unspent, amountNeeded);
+        if (pick.ok) {
+          setSpendableNotes(pick.notes);
+          setNotePickError(null);
+          return true;
+        }
+        setSpendableNotes(null);
+        setNotePickError(
+          pick.reason === "need_fourth"
+            ? "This payment needs four notes (or a larger one). Shield a bit more, or wait for another note to confirm."
+            : null,
+        );
+        return false;
+      } finally {
+        setScanning(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!wallet || !link?.privateSettlement) return;
+    const payAmount = link.amount || customAmount.trim();
+    if (!payAmount) {
+      setSpendableNotes(null);
+      setNotePickError(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const unspent = await listUnspentNotesV2(wallet);
+        const pick = selectNotesForAmount(unspent, toBaseUnits(payAmount));
         if (pick.ok) {
           setSpendableNotes(pick.notes);
           setNotePickError(null);
@@ -198,16 +298,15 @@ export function PaymentCheckout({ linkId }: Props) {
           setSpendableNotes(null);
           setNotePickError(
             pick.reason === "need_fourth"
-              ? "This payment needs four notes (or a larger one). You have three ready notes — top up once more, or wait for another note to confirm."
+              ? "This payment needs four notes (or a larger one). Shield a bit more, or wait for another note to confirm."
               : null,
           );
         }
-      } finally {
-        setScanning(false);
+      } catch {
+        /* ignore local reselect errors */
       }
-    },
-    [],
-  );
+    })();
+  }, [customAmount, link?.amount, link?.privateSettlement, wallet]);
 
   async function handleConnect() {
     setError(null);
@@ -242,15 +341,16 @@ export function PaymentCheckout({ linkId }: Props) {
         setSpendPub(skResult.keys.spendPub);
 
         const payAmount = link.amount || customAmount.trim();
-        if (payAmount) {
-          setStatus("Checking shielded balance…");
-          await checkForSpendableNote(
-            result.address,
-            vkResult.keys.viewSecret,
-            skResult.keys.spendSecret,
-            toBaseUnits(payAmount),
-          );
+        if (!depositAmount.trim() && (link.amount || payAmount)) {
+          setDepositAmount(link.amount || payAmount);
         }
+        setStatus("Checking shielded balance…");
+        await refreshShieldedState(
+          result.address,
+          vkResult.keys.viewSecret,
+          skResult.keys.spendSecret,
+          payAmount ? toBaseUnits(payAmount) : "",
+        );
       }
     } finally {
       setBusy(false);
@@ -289,11 +389,9 @@ export function PaymentCheckout({ linkId }: Props) {
           link.spendPub
         ) {
           await handleTransferPay(amountBaseUnits);
-        } else if (link.shieldCommitment && link.shieldProof) {
-          await handleDepositPay(amountBaseUnits);
         } else {
           setError(
-            "No shielded balance and no merchant deposit proof. Top up your wallet or ask the merchant to recreate the link.",
+            "Shield enough XLM on this page first, then pay privately.",
           );
           setBusy(false);
           return;
@@ -340,52 +438,86 @@ export function PaymentCheckout({ linkId }: Props) {
     }
   }
 
-  async function handleDepositPay(amountBaseUnits: string) {
-    if (!link || !wallet || !link.shieldCommitment || !link.shieldProof) return;
+  async function handleShieldDeposit() {
+    if (!link || !wallet || !spendSecret || !viewSecret) return;
+    const amountDisplay = depositAmount.trim();
+    if (!amountDisplay) {
+      setError("Enter how much XLM to shield.");
+      return;
+    }
 
-    const already = await getPoolCommitments([link.shieldCommitment]);
-    if (already.ok) {
-      const hit = already.commitments.find(
-        (c) =>
-          c.leaf.replace(/^0x/i, "").toLowerCase() ===
-            link.shieldCommitment!.replace(/^0x/i, "").toLowerCase() &&
-          (c.leafIndex != null || Boolean(c.txHash)),
-      );
-      if (hit) {
-        if (hit.txHash) {
-          await claimPaymentLink(link.id, hit.txHash, link.shieldCommitment);
-          setTxHash(hit.txHash);
-        }
-        setError(
-          "This privacy link was already paid. The invoice note is already in the pool. Generate a new Collect privacy link for another payer, or top up this wallet and Pay privately.",
-        );
+    setBusy(true);
+    setError(null);
+    setStatus("Building deposit proof…");
+
+    try {
+      const salt = randomSaltHex();
+      const secrets = await deriveNoteSecrets(spendSecret, salt);
+      const proofResult = await buildDepositProof(amountDisplay, secrets);
+      if (!proofResult.ok) {
+        setError(proofResult.error);
         setStatus(null);
         return;
       }
-    }
 
-    setStatus("Sign deposit in Freighter…");
-    const submitted = await submitPoolDeposit({
-      fromAddress: wallet,
-      amountBaseUnits,
-      commitmentHex: link.shieldCommitment,
-      proofHex: link.shieldProof,
-    });
-    if (!submitted.ok) {
-      setError(submitted.error);
+      setStatus("Sign deposit in Freighter…");
+      const submitted = await submitPoolDeposit({
+        fromAddress: wallet,
+        amountBaseUnits: proofResult.result.amountBaseUnits,
+        commitmentHex: proofResult.result.commitment,
+        proofHex: proofResult.result.proof,
+      });
+      if (!submitted.ok) {
+        setError(submitted.error);
+        setStatus(null);
+        return;
+      }
+
+      setDepositTxHash(submitted.hash);
+      await putNoteV2({
+        commitment: proofResult.result.commitment,
+        ownerWallet: wallet,
+        ownerPk: proofResult.result.ownerPk,
+        k: proofResult.result.k,
+        amount: amountDisplay,
+        amountBaseUnits: proofResult.result.amountBaseUnits,
+        leafIndex: null,
+        spent: false,
+        origin: "topup",
+        salt,
+        createdAt: Date.now(),
+      });
+
+      const payAmount = link.amount || customAmount.trim();
+      setStatus("Deposit submitted. Waiting for confirmation…");
+      let ready = false;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((resolve) => window.setTimeout(resolve, 4000));
+        ready = await refreshShieldedState(
+          wallet,
+          viewSecret,
+          spendSecret,
+          payAmount ? toBaseUnits(payAmount) : "",
+        );
+        if (ready) break;
+        setStatus(
+          i < 2
+            ? "Deposit submitted. Waiting for confirmation…"
+            : "Still confirming the deposit on-chain…",
+        );
+      }
+
+      setStatus(
+        ready
+          ? "Shielded balance is ready. You can pay privately."
+          : "Deposit submitted. Pay unlocks once this note confirms.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Deposit failed.");
       setStatus(null);
-      return;
+    } finally {
+      setBusy(false);
     }
-    setTxHash(submitted.hash);
-    const claimed = await claimPaymentLink(
-      link.id,
-      submitted.hash,
-      link.shieldCommitment,
-    );
-    if (!claimed.ok) {
-      console.warn("Deposit claim failed:", claimed.error);
-    }
-    setStatus("Deposit submitted. The merchant owns this note.");
   }
 
   async function handleTransferPay(amountBaseUnits: string) {
@@ -640,18 +772,12 @@ export function PaymentCheckout({ linkId }: Props) {
   const canPay =
     Boolean(displayAmount) &&
     !scanning &&
-    !(
-      link.privateSettlement &&
-      !spendableNotes &&
-      (!link.shieldCommitment || !link.shieldProof)
-    );
+    (!link.privateSettlement || Boolean(spendableNotes));
 
   const payButtonLabel = !wallet
-    ? "Pay with Stellar Wallet"
+    ? "Connect Freighter"
     : link.privateSettlement
-      ? spendableNotes
-        ? `Pay privately · ${amountLabel}`
-        : `Shield & pay · ${amountLabel}`
+      ? `Pay privately · ${amountLabel}`
       : `Pay ${amountLabel}`;
 
   return (
@@ -671,9 +797,7 @@ export function PaymentCheckout({ linkId }: Props) {
             <div className="relative space-y-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#4A63BE] text-sm font-semibold text-white">
-                    {businessName.slice(0, 1).toUpperCase()}
-                  </span>
+                  <HypertronLogoMark size={36} variant="brand" />
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-white">
                       {businessName}
@@ -840,9 +964,7 @@ export function PaymentCheckout({ linkId }: Props) {
                 <div className="flex min-h-0 flex-1 flex-col">
                   <div className="mt-1 flex items-center justify-between gap-3 rounded-xl border border-[#E7B66D]/35 bg-[#FBF7F0]/50 px-3.5 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#4A63BE] text-[11px] font-bold text-white">
-                        {link.currency.slice(0, 1)}
-                      </span>
+                      <TokenMark currency={link.currency} className="size-9" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-[#0F1939]">
                           {link.currency} on Stellar
@@ -856,56 +978,101 @@ export function PaymentCheckout({ linkId }: Props) {
                   </div>
 
                   {link.privateSettlement ? (
-                    <div className="mt-3 rounded-xl border border-[#E7B66D]/40 bg-[#FBF7F0] px-3.5 py-3 text-sm">
+                    <div className="mt-3 space-y-3 rounded-xl border border-[#E7B66D]/40 bg-[#FBF7F0] px-3.5 py-3 text-sm">
                       <p className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[#C9A46A] uppercase">
                         <Shield className="size-3.5" />
                         Private settlement
                       </p>
                       {!wallet ? (
-                        <p className="mt-1 text-xs text-slate-600">
-                          Connect Freighter to pay from shielded notes or via
-                          pool deposit.
+                        <p className="text-xs text-slate-600">
+                          Connect Freighter to see your shielded balance. Pay
+                          stays locked until you have enough shielded XLM.
                         </p>
-                      ) : scanning ? (
-                        <p className="mt-1 flex items-center gap-2 text-xs text-slate-600">
+                      ) : scanning && shieldedDisplay == null ? (
+                        <p className="flex items-center gap-2 text-xs text-slate-600">
                           <Loader2 className="size-3.5 animate-spin" />
                           Checking shielded balance…
                         </p>
-                      ) : spendableNotes ? (
-                        <p className="mt-1 text-xs text-emerald-700">
-                          Paying from {spendableNotes.length} note
-                          {spendableNotes.length === 1 ? "" : "s"} (
-                          {fromBaseUnits(
-                            spendableNotes
-                              .reduce(
-                                (s, n) => s + BigInt(n.amountBaseUnits),
-                                BigInt(0),
-                              )
-                              .toString(),
-                          )}{" "}
-                          XLM) — amount stays hidden.
-                        </p>
-                      ) : notePickError ? (
-                        <p className="mt-1 text-xs text-amber-700">
-                          {notePickError}
-                        </p>
-                      ) : link.shieldCommitment && link.shieldProof ? (
-                        <p className="mt-1 text-xs text-amber-800">
-                          No shielded balance — using deposit (amount visible
-                          on-chain).{" "}
-                          <a href="/wallet" className="underline">
-                            Top up first
-                          </a>{" "}
-                          for hidden amounts.
-                        </p>
                       ) : (
-                        <p className="mt-1 text-xs text-red-700">
-                          No shielded balance.{" "}
-                          <a href="/wallet" className="underline">
-                            Top up your wallet
-                          </a>{" "}
-                          to pay privately.
-                        </p>
+                        <>
+                          <div className="rounded-lg border border-[#E7B66D]/30 bg-white px-3 py-2">
+                            <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                              Shielded balance
+                            </p>
+                            <p className="mt-0.5 text-lg font-semibold text-[#0F1939]">
+                              {shieldedDisplay ?? "0"}{" "}
+                              <span className="text-sm font-medium text-slate-500">
+                                XLM
+                              </span>
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {shieldedNoteCount} ready note
+                              {shieldedNoteCount === 1 ? "" : "s"}
+                              {pendingNoteCount > 0
+                                ? ` · ${pendingNoteCount} confirming`
+                                : ""}
+                            </p>
+                          </div>
+                          {spendableNotes ? (
+                            <p className="text-xs text-emerald-700">
+                              Enough to pay privately from{" "}
+                              {spendableNotes.length} note
+                              {spendableNotes.length === 1 ? "" : "s"}. Amount
+                              stays hidden on the payment.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-800">
+                              {notePickError ||
+                                (displayAmount
+                                  ? `Need ${displayAmount} XLM shielded before you can pay. Shield any amount below — the invoice amount, or more for later privacy payments.`
+                                  : "Enter an amount, then shield XLM to unlock Pay.")}
+                            </p>
+                          )}
+                          {!paid ? (
+                            <div className="space-y-2">
+                              <Label
+                                htmlFor="shield-amount"
+                                className="text-[11px] text-slate-500"
+                              >
+                                Shield XLM into this wallet
+                              </Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="shield-amount"
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder={displayAmount || "e.g. 10"}
+                                  value={depositAmount}
+                                  onChange={(e) =>
+                                    setDepositAmount(e.target.value.trim())
+                                  }
+                                  className="h-9 flex-1 border-[#E7B66D]/35 bg-white text-sm text-slate-900"
+                                  disabled={busy}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={busy || !depositAmount.trim()}
+                                  className="h-9 shrink-0 border-[#E7B66D]/45 bg-white px-3 text-xs font-semibold text-[#0F1939] hover:bg-white"
+                                  onClick={() => void handleShieldDeposit()}
+                                >
+                                  {busy && !spendableNotes ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    "Shield"
+                                  )}
+                                </Button>
+                              </div>
+                              <p className="text-[11px] text-slate-500">
+                                Shielding is a public deposit. The payment
+                                itself stays private.
+                              </p>
+                              {depositTxHash ? (
+                                <ExplorerLinks txHash={depositTxHash} showContract />
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </>
                       )}
                     </div>
                   ) : null}
@@ -942,7 +1109,10 @@ export function PaymentCheckout({ linkId }: Props) {
                           void (wallet ? handlePay() : handleConnect())
                         }
                       >
-                        {busy ? (
+                        {busy &&
+                        ( !wallet ||
+                          Boolean(spendableNotes) ||
+                          !link.privateSettlement) ? (
                           <>
                             <Loader2 className="size-4 animate-spin" />
                             {status || "Working…"}
@@ -957,8 +1127,13 @@ export function PaymentCheckout({ linkId }: Props) {
                     </>
                   )}
 
-                  {status && !busy ? (
-                    <p className="mt-2 text-sm text-slate-600">{status}</p>
+                  {status ? (
+                    <p className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                      {busy ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                      ) : null}
+                      {status}
+                    </p>
                   ) : null}
                   {error ? (
                     <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -1042,7 +1217,7 @@ function CheckoutPageShell({
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <HypertronLogoMark size={32} />
+          <HypertronLogoMark size={32} variant="brand" />
             <div className="leading-tight">
               <p className="text-sm font-semibold tracking-tight text-[#0F1939]">
                 Hypertron
@@ -1124,7 +1299,7 @@ function QrPanel({
         </p>
         <p className="mt-0.5 text-[11px] text-slate-500">
           {privateSettlement
-            ? "Scan to open this checkout and pay via the Hypertron pool."
+            ? "Scan to open this checkout. You’ll shield XLM first, then pay privately."
             : "Scan with any wallet app, or copy the destination address."}
         </p>
       </div>
@@ -1153,8 +1328,8 @@ function QrPanel({
                     fgColor="#0F1939"
                   />
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="flex size-8 items-center justify-center rounded-full border-[3px] border-white bg-[#4A63BE] text-[10px] font-bold text-white">
-                      H
+                    <div className="rounded-full border-[3px] border-white">
+                      <HypertronLogoMark size={28} variant="brand" />
                     </div>
                   </div>
                 </div>
@@ -1180,9 +1355,7 @@ function QrPanel({
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
           <div className="flex items-center justify-between gap-2 rounded-lg border border-[#E7B66D]/35 bg-white px-3 py-2">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#4A63BE] text-[9px] font-bold text-white">
-                {currency.slice(0, 1)}
-              </div>
+              <TokenMark currency={currency} className="size-7" />
               <p className="truncate text-xs font-medium text-[#0F1939]">
                 {currency} on Stellar
               </p>

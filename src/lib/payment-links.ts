@@ -152,7 +152,12 @@ export async function createPaymentLink(input: {
       expiryDays: input.expiryDays,
       workflowStage: input.workflowStage,
     };
-    if (input.privateSettlement) {
+    if (
+      input.privateSettlement &&
+      input.shieldSalt &&
+      input.shieldCommitment &&
+      input.shieldProof
+    ) {
       body.shieldSalt = input.shieldSalt;
       body.shieldCommitment = input.shieldCommitment;
       body.shieldProof = input.shieldProof;
