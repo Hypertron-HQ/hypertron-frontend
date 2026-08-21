@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -45,7 +45,7 @@ export function FreighterSignupDialog({
   description = "Connect your Stellar wallet and sign a one-time challenge to continue.",
 }: {
   redirectTo?: string;
-  triggerLabel?: string;
+  triggerLabel?: ReactNode;
   triggerClassName?: string;
   eyebrow?: string;
   title?: string;
