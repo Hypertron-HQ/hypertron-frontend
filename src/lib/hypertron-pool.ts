@@ -50,11 +50,8 @@ export function recipientFieldHex(stellarAddress: string): string {
 export function formatPoolHostError(raw: string): string {
   if (/Error\(Contract, #4\)/.test(raw) && /insert/i.test(raw)) {
     return (
-      "This privacy link’s note is already in the pool (duplicate leaf). " +
-      "A Collect privacy link can only be Shield & pay’d once — the first " +
-      "successful deposit owns that commitment. Generate a new privacy " +
-      "payment link for another payer, or top up the paying wallet and use " +
-      "Pay privately from shielded balance."
+      "This deposit note is already in the pool (duplicate leaf). " +
+      "If you just shielded, wait for confirmation. Otherwise try a new deposit amount."
     );
   }
   if (/Error\(Contract, #4\)/.test(raw)) {

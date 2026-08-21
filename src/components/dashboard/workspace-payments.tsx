@@ -23,14 +23,7 @@ import {
   updateBusinessProfile,
   type BusinessProfile,
 } from "@/lib/business";
-import { putNote } from "@/lib/hypertron-note-store";
-import { buildDepositProof } from "@/lib/hypertron-prover";
-import {
-  deriveNoteSecrets,
-  deriveViewingKey,
-  deriveSpendKey,
-  randomSaltHex,
-} from "@/lib/hypertron-viewkey";
+import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
 import { createPaymentLink } from "@/lib/payment-links";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/mockdata";
@@ -189,15 +182,6 @@ export function WorkspacePayments({
     setStatus(null);
 
     try {
-      let shield:
-        | {
-            shieldSalt: string;
-            shieldCommitment: string;
-            shieldProof: string;
-            amountBaseUnits: string;
-          }
-        | undefined;
-
       if (privateSettlement) {
         if (!profile.viewPub?.trim() || !profile.spendPub?.trim()) {
           const enabled = await ensurePrivatePubs();
@@ -206,29 +190,6 @@ export function WorkspacePayments({
             return;
           }
         }
-
-        setStatus("Building deposit proof…");
-        const spendKeys = await deriveSpendKey(session.walletAddress);
-        if (!spendKeys.ok) {
-          setError(spendKeys.error);
-          return;
-        }
-        const salt = randomSaltHex();
-        const { ownerPk, k } = await deriveNoteSecrets(
-          spendKeys.keys.spendSecret,
-          salt,
-        );
-        const proved = await buildDepositProof(normalized, { ownerPk, k });
-        if (!proved.ok) {
-          setError(proved.error);
-          return;
-        }
-        shield = {
-          shieldSalt: salt,
-          shieldCommitment: proved.result.commitment,
-          shieldProof: proved.result.proof,
-          amountBaseUnits: proved.result.amountBaseUnits,
-        };
       }
 
       setStatus("Creating payment link…");
@@ -242,29 +203,11 @@ export function WorkspacePayments({
         privateSettlement,
         expiryDays: expiry,
         workflowStage: workflowStage.trim() || undefined,
-        shieldSalt: shield?.shieldSalt,
-        shieldCommitment: shield?.shieldCommitment,
-        shieldProof: shield?.shieldProof,
       });
 
       if (!created.ok) {
         setError(created.error);
         return;
-      }
-
-      if (shield) {
-        await putNote({
-          linkId: created.link.linkId,
-          businessId: workspace.id,
-          salt: shield.shieldSalt,
-          amount: normalized,
-          amountBaseUnits: shield.amountBaseUnits,
-          commitment: shield.shieldCommitment,
-          leafIndex: null,
-          paidAt: null,
-          spent: false,
-          createdAt: Date.now(),
-        });
       }
 
       setResult({
@@ -594,8 +537,8 @@ export function WorkspacePayments({
                       <p className="mt-1 text-xs leading-relaxed text-slate-500">
                         {privateSettlement
                           ? profile.viewPub?.trim() && profile.spendPub?.trim()
-                            ? "You pre-mint the note; the customer only funds it. Amount stays public on deposit."
-                            : "First use will ask Freighter for viewing + spend keys, then pre-mint the note."
+                            ? "Customer shields their own XLM, then pays you with a private transfer. Payment amount stays hidden."
+                            : "First use will ask Freighter for viewing + spend keys so you can receive private notes."
                           : "Public Stellar payment straight to your Freighter wallet (G…) with memo attribution."}
                       </p>
                     </div>
@@ -631,7 +574,7 @@ export function WorkspacePayments({
                 <div className="space-y-2">
                   <p className="text-xs text-slate-500">
                     {privateSettlement
-                      ? "Checkout will invoke pool deposit on the Hypertron transfer contract."
+                      ? "Checkout requires a shielded balance, then a private pool transfer to you."
                       : "Settles to your wallet · attributed via memo (not the privacy pool)"}
                   </p>
                   <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">

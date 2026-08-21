@@ -272,7 +272,7 @@ export function SandboxPayments() {
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           {privateSettlement
-                            ? "Demo private pool settlement."
+                            ? "Customer shields XLM first, then pays with a private transfer."
                             : "Public Stellar payment straight to your Freighter wallet (G…) with memo attribution."}
                         </p>
                       </div>
