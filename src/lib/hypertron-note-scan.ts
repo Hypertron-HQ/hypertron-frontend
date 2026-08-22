@@ -11,6 +11,7 @@ import {
   getPoolLeaves,
   getPoolNullifiers,
   getPoolStatus,
+  getPoolCommitments,
   findLeafIndex,
 } from "@/lib/hypertron-indexer";
 import {
@@ -161,26 +162,44 @@ export async function refreshNoteStatuses(
   spendSk: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const leavesRes = await getPoolLeaves();
-    if (!leavesRes.ok) return { ok: false, error: leavesRes.error };
-
-    const nullifiersRes = await getPoolNullifiers();
-    if (!nullifiersRes.ok) return { ok: false, error: nullifiersRes.error };
-
-    const leaves = leavesRes.data.leaves;
-    const nullifierSet = new Set(
-      nullifiersRes.nullifiers.map((n) => n.toLowerCase().replace(/^0x/, "")),
-    );
-
     const notes = await listNotesV2(ownerWallet);
+
+    const leavesRes = await getPoolLeaves();
+    const leaves = leavesRes.ok ? leavesRes.data.leaves : [];
+
+    const pending = notes.filter((note) => note.leafIndex == null);
+    const commitmentHits =
+      pending.length > 0 ? await getPoolCommitments(pending.map((n) => n.commitment)) : null;
+    const commitmentIndex = new Map<string, number>();
+    if (commitmentHits?.ok) {
+      for (const row of commitmentHits.commitments) {
+        if (row.leafIndex == null) continue;
+        commitmentIndex.set(
+          row.leaf.toLowerCase().replace(/^0x/, ""),
+          row.leafIndex,
+        );
+      }
+    }
+
+    let nullifierSet = new Set<string>();
+    const nullifiersRes = await getPoolNullifiers();
+    if (nullifiersRes.ok) {
+      nullifierSet = new Set(
+        nullifiersRes.nullifiers.map((n) => n.toLowerCase().replace(/^0x/, "")),
+      );
+    }
 
     for (const note of notes) {
       let changed = false;
 
       if (note.leafIndex == null) {
         const idx = findLeafIndex(leaves, note.commitment);
-        if (idx >= 0) {
-          note.leafIndex = idx;
+        const fromLookup = commitmentIndex.get(
+          note.commitment.toLowerCase().replace(/^0x/, ""),
+        );
+        const resolved = idx >= 0 ? idx : (fromLookup ?? -1);
+        if (resolved >= 0) {
+          note.leafIndex = resolved;
           changed = true;
         }
       }
@@ -220,12 +239,12 @@ export async function fullScan(
   spendSk: string,
 ): Promise<ScanResult> {
   const scanRes = await scanForNotes(ownerWallet, viewSecret);
-  if (scanRes.state === "indexer_down") return scanRes;
-
   const refreshRes = await refreshNoteStatuses(ownerWallet, spendSk);
-  if (!refreshRes.ok) {
-    return { ...scanRes, error: refreshRes.error };
+  if (refreshRes.ok) {
+    return scanRes.state === "indexer_down"
+      ? { ...scanRes, state: "ready" }
+      : scanRes;
   }
-
-  return scanRes;
+  if (scanRes.state === "indexer_down") return scanRes;
+  return { ...scanRes, error: refreshRes.error };
 }
