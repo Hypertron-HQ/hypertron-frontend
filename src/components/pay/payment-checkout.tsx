@@ -308,6 +308,43 @@ export function PaymentCheckout({ linkId }: Props) {
     })();
   }, [customAmount, link?.amount, link?.privateSettlement, wallet]);
 
+  useEffect(() => {
+    if (
+      !wallet ||
+      !viewSecret ||
+      !spendSecret ||
+      !link?.privateSettlement ||
+      link.paidAt ||
+      link.claimedAt
+    ) {
+      return;
+    }
+    if (spendableNotes && pendingNoteCount === 0) return;
+
+    const payAmount = link.amount || customAmount.trim();
+    const id = window.setInterval(() => {
+      void refreshShieldedState(
+        wallet,
+        viewSecret,
+        spendSecret,
+        payAmount ? toBaseUnits(payAmount) : "",
+      );
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [
+    wallet,
+    viewSecret,
+    spendSecret,
+    link?.privateSettlement,
+    link?.paidAt,
+    link?.claimedAt,
+    link?.amount,
+    customAmount,
+    spendableNotes,
+    pendingNoteCount,
+    refreshShieldedState,
+  ]);
+
   async function handleConnect() {
     setError(null);
     setBusy(true);
@@ -489,9 +526,10 @@ export function PaymentCheckout({ linkId }: Props) {
       });
 
       const payAmount = link.amount || customAmount.trim();
-      setStatus("Deposit submitted. Waiting for confirmation…");
+      setPendingNoteCount((count) => count + 1);
+      setStatus("Deposit submitted. Waiting for the indexer to confirm…");
       let ready = false;
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 30; i++) {
         await new Promise((resolve) => window.setTimeout(resolve, 4000));
         ready = await refreshShieldedState(
           wallet,
@@ -502,15 +540,15 @@ export function PaymentCheckout({ linkId }: Props) {
         if (ready) break;
         setStatus(
           i < 2
-            ? "Deposit submitted. Waiting for confirmation…"
-            : "Still confirming the deposit on-chain…",
+            ? "Deposit submitted. Waiting for the indexer to confirm…"
+            : "Indexer is catching up. Pay unlocks when this note is indexed.",
         );
       }
 
       setStatus(
         ready
           ? "Shielded balance is ready. You can pay privately."
-          : "Deposit submitted. Pay unlocks once this note confirms.",
+          : "Deposit is on-chain. We’ll keep checking the indexer — Pay unlocks when the note is ready.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deposit failed.");
@@ -1022,10 +1060,12 @@ export function PaymentCheckout({ linkId }: Props) {
                             </p>
                           ) : (
                             <p className="text-xs text-amber-800">
-                              {notePickError ||
-                                (displayAmount
-                                  ? `Need ${displayAmount} XLM shielded before you can pay. Shield any amount below — the invoice amount, or more for later privacy payments.`
-                                  : "Enter an amount, then shield XLM to unlock Pay.")}
+                              {pendingNoteCount > 0
+                                ? "Your deposit is on-chain. Pay unlocks after the indexer confirms the note — this page keeps checking."
+                                : notePickError ||
+                                  (displayAmount
+                                    ? `Need ${displayAmount} XLM shielded before you can pay. Shield any amount below — the invoice amount, or more for later privacy payments.`
+                                    : "Enter an amount, then shield XLM to unlock Pay.")}
                             </p>
                           )}
                           {!paid ? (
