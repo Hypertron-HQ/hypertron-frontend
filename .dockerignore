@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.git
+.env
+.env.*
+!.env.example
+*.md
+.cursor
+.pnpm-store
+.agents
+legacy
+coverage
+.vercel
+*.tsbuildinfo
