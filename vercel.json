@@ -1,16 +1,1 @@
-{
-  "rewrites": [
-    {
-      "source": "/aws-core/:path*",
-      "destination": "http://hypertron-core-438173.us-west-2.elasticbeanstalk.com/:path*"
-    },
-    {
-      "source": "/aws-api/:path*",
-      "destination": "http://hypertron-api-438173.us-west-2.elasticbeanstalk.com/:path*"
-    },
-    {
-      "source": "/aws-indexer/:path*",
-      "destination": "http://hypertron-indexer-438173.us-west-2.elasticbeanstalk.com/:path*"
-    }
-  ]
-}
+{}
