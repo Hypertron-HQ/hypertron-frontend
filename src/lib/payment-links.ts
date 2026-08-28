@@ -415,6 +415,41 @@ export async function claimPaymentLink(
   }
 }
 
+const CUSTOMER_EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+export function extractCustomerEmail(value: string): string | null {
+  const match = value.trim().match(CUSTOMER_EMAIL_RE);
+  return match ? match[0] : null;
+}
+
+/**
+ * Send a payment invoice to the customer email on a Collect link.
+ */
+export async function sendPaymentLinkInvoice(
+  id: string,
+  to?: string,
+): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  try {
+    const res = await apiFetch(
+      `/api/payment-link/${encodeURIComponent(id)}/invoice`,
+      {
+        method: "POST",
+        body: JSON.stringify(to?.trim() ? { to: to.trim() } : {}),
+      },
+    );
+    const json = await readJson<{ to?: string; error?: string }>(res);
+    if (!res.ok || !json.to) {
+      return {
+        ok: false,
+        error: json.error ?? "Could not send the invoice email.",
+      };
+    }
+    return { ok: true, to: json.to };
+  } catch {
+    return { ok: false, error: "Could not reach the API." };
+  }
+}
+
 /**
  * Merchant marks a claimed link settled. Requires the owning session.
  */
