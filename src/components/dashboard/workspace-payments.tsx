@@ -8,6 +8,7 @@ import {
   Copy,
   ExternalLink,
   Info,
+  Mail,
   Shield,
   User,
   Wallet,
@@ -24,7 +25,11 @@ import {
   type BusinessProfile,
 } from "@/lib/business";
 import { deriveViewingKey, deriveSpendKey } from "@/lib/hypertron-viewkey";
-import { createPaymentLink } from "@/lib/payment-links";
+import {
+  createPaymentLink,
+  extractCustomerEmail,
+  sendPaymentLinkInvoice,
+} from "@/lib/payment-links";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/mockdata";
 
@@ -113,6 +118,10 @@ export function WorkspacePayments({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [mailState, setMailState] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [mailMessage, setMailMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     linkId: string;
@@ -215,6 +224,8 @@ export function WorkspacePayments({
         url: created.link.url,
         memo: created.link.memo,
       });
+      setMailState("idle");
+      setMailMessage(null);
       setLinksRefreshKey((key) => key + 1);
     } finally {
       setLoading(false);
@@ -231,6 +242,23 @@ export function WorkspacePayments({
     } catch {
       /* ignore */
     }
+  }
+
+  const customerEmail = extractCustomerEmail(customer);
+  const canSendMail = Boolean(result && customerEmail);
+
+  async function sendMail() {
+    if (!result || !customerEmail || mailState === "sending") return;
+    setMailState("sending");
+    setMailMessage(null);
+    const sent = await sendPaymentLinkInvoice(result.linkId, customerEmail);
+    if (!sent.ok) {
+      setMailState("error");
+      setMailMessage(sent.error);
+      return;
+    }
+    setMailState("sent");
+    setMailMessage(`Invoice sent to ${sent.to}`);
   }
 
   return (
@@ -340,20 +368,59 @@ export function WorkspacePayments({
                   </p>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 shrink-0 gap-2 rounded-xl border-emerald-200 bg-white text-emerald-800"
-                onClick={copyLink}
-              >
-                {copied ? (
-                  <CheckCheck className="size-4" />
-                ) : (
-                  <Copy className="size-4" />
-                )}
-                {copied ? "Copied" : "Copy link"}
-              </Button>
+              <div className="flex shrink-0 flex-col items-stretch gap-1.5 sm:items-end">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canSendMail || mailState === "sending"}
+                    title={
+                      canSendMail
+                        ? `Email invoice to ${customerEmail}`
+                        : "Add a customer email to send this invoice"
+                    }
+                    className="h-8 shrink-0 gap-2 rounded-xl border-emerald-200 bg-white text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={sendMail}
+                  >
+                    {mailState === "sent" ? (
+                      <CheckCheck className="size-4" />
+                    ) : (
+                      <Mail className="size-4" />
+                    )}
+                    {mailState === "sending"
+                      ? "Sending…"
+                      : mailState === "sent"
+                        ? "Sent"
+                        : "Send mail"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 gap-2 rounded-xl border-emerald-200 bg-white text-emerald-800"
+                    onClick={copyLink}
+                  >
+                    {copied ? (
+                      <CheckCheck className="size-4" />
+                    ) : (
+                      <Copy className="size-4" />
+                    )}
+                    {copied ? "Copied" : "Copy link"}
+                  </Button>
+                </div>
+                {mailMessage ? (
+                  <p
+                    className={
+                      mailState === "error"
+                        ? "max-w-[260px] text-right text-[11px] text-rose-700"
+                        : "max-w-[260px] text-right text-[11px] text-emerald-800"
+                    }
+                  >
+                    {mailMessage}
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
