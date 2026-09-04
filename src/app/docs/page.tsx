@@ -7,44 +7,53 @@ import {
   ChevronRight,
   Layers3,
   LockKeyhole,
+  Package,
   Radar,
 } from "lucide-react";
 import { DocsShell, SectionHeading } from "@/components/docs/docs-shell";
 
 export const metadata: Metadata = {
   description:
-    "Hypertron is a privacy interface on Stellar — protocol, API, and platform on one settlement rail.",
+    "Hypertron is composable privacy infrastructure for stablecoin payments and settlement on Stellar: protocol, merchant payments, API, and tooling on one pool.",
 };
 
 const toc = [
   { href: "#overview", label: "What Hypertron is" },
-  { href: "#layers", label: "Three layers" },
+  { href: "#layers", label: "Four layers" },
 ] as const;
 
 const layers = [
   {
     icon: LockKeyhole,
-    title: "Protocol",
-    audience: "Soroban developers",
-    copy: "The privacy primitive: Groth16 over BLS12-381, a depth-20 Poseidon tree, and N-in / 2-out private transfer on a shared pool.",
+    title: "Privacy protocol",
+    audience: "For developers",
+    copy: "Call the shielded pool from your own Stellar app. Apache-2.0 contracts, browser proving, no Hypertron account required.",
     href: "/docs/protocol",
     cta: "Read the protocol",
   },
   {
+    icon: Layers3,
+    title: "Merchant payments",
+    audience: "For businesses",
+    copy: "Payment links, hosted checkout, private settlement, treasury, and monitoring, without circuits, proving systems, or Soroban internals.",
+    href: "/docs/platform",
+    cta: "Read merchant payments",
+  },
+  {
     icon: Braces,
     title: "Payments API",
-    audience: "Application developers",
-    copy: "Hosted checkout, payment objects, and signed webhooks for products that already have a payment experience.",
+    audience: "For applications",
+    copy: "Create payments, host checkout, track settlement, and receive HMAC-signed webhooks while you keep the customer experience.",
     href: "/docs/api",
     cta: "Read the API",
   },
   {
-    icon: Layers3,
-    title: "Platform",
-    audience: "Finance and operations teams",
-    copy: "Payment links, treasury, settlement, and viewing-key disclosure in one workspace. Same pool, no new anonymity set.",
-    href: "/docs/platform",
-    cta: "Read the platform",
+    icon: Package,
+    title: "Developer tooling",
+    audience: "Direction of the platform",
+    copy: "Reusable SDKs and crates for note discovery, proof generation, relaying, verification, and selective disclosure. Not a packaged SDK yet.",
+    href: "/docs/tooling",
+    cta: "Read the direction",
   },
 ] as const;
 
@@ -62,10 +71,18 @@ export default function DocsPage() {
           <span className="text-[#98a2b3]">one interface.</span>
         </h1>
         <p className="mt-7 max-w-2xl text-base leading-7 text-[#5d6879] sm:text-lg sm:leading-8">
-          Hypertron is a unified privacy interface on Stellar for shielding,
-          routing, settlement, and selective disclosure. The protocol is the
-          foundation: a permissionless shielded pool. The Payments API and the
-          workspace sit on that same note set.
+          Hypertron is composable privacy infrastructure for stablecoin payments
+          and settlement on Stellar. Businesses accept and manage payments
+          without exposing amounts or counterparties on the public ledger. A
+          zero-knowledge proof is generated locally in the browser; Stellar
+          verifies the payment without revealing the private details inside the
+          pool.
+        </p>
+        <p className="mt-5 max-w-2xl text-base leading-7 text-[#5d6879] sm:text-lg sm:leading-8">
+          Spend keys stay separate from viewing keys, so an accountant or
+          auditor can see relevant records without the ability to spend. The
+          goal is that a business or developer does not have to become a ZK
+          engineer to use that layer.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
@@ -92,12 +109,12 @@ export default function DocsPage() {
         className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
       >
         <SectionHeading
-          eyebrow="Three layers"
-          title="Protocol first. Then API. Then platform."
-          copy="Every path settles through the same Hypertron pools. Pick the layer your team controls."
+          eyebrow="Four layers"
+          title="Protocol first. Then merchant, API, and tooling."
+          copy="Every path settles through the same Hypertron pools. Pick the layer your team controls. Tooling is the direction of the platform, not a published SDK today."
         />
 
-        <div className="mt-9 grid gap-px overflow-hidden border border-[#dfe5ed] bg-[#dfe5ed] md:grid-cols-3">
+        <div className="mt-9 grid gap-px overflow-hidden border border-[#dfe5ed] bg-[#dfe5ed] md:grid-cols-2">
           {layers.map((path) => {
             const Icon = path.icon;
             return (

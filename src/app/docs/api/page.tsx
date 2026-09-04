@@ -20,6 +20,7 @@ const toc = [
   { href: "#quickstart", label: "Quickstart" },
   { href: "#lifecycle", label: "Payment lifecycle" },
   { href: "#webhooks", label: "Webhooks" },
+  { href: "#assets", label: "Assets" },
   { href: "#environments", label: "Environments" },
 ] as const;
 
@@ -28,8 +29,8 @@ const curlExample = `curl -X POST "$HYPERTRON_API/v1/payments" \\
   -H "Idempotency-Key: order_1234" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "amount": "125.00",
-    "currency": "USDC",
+    "amount": "25.00",
+    "currency": "XLM",
     "description": "Order #1234",
     "customer_email": "customer@example.com",
     "metadata": { "order_id": "ord_1234" }
@@ -42,7 +43,7 @@ const lifecycle = [
   },
   {
     label: "Pay",
-    copy: "Customer opens hosted checkout and pays from a Stellar wallet — privately if they hold covering notes.",
+    copy: "Customer opens hosted checkout and pays from a Stellar wallet, privately if they hold covering notes.",
   },
   {
     label: "Confirm",
@@ -68,11 +69,12 @@ export default function ApiDocsPage() {
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-[#5d6879]">
           The Payments API is for products that already have a payment
-          experience. Your server creates a{" "}
+          experience: commerce, payroll, treasury, or any app that should
+          keep owning checkout. Your server creates a{" "}
           <code className="font-mono text-[13px]">Payment</code>, Hypertron
           hosts checkout, the customer pays, you get a stateful object and
-          signed events. Checkout can spend into the shielded pool; the API
-          does not replace the protocol.
+          HMAC-signed events. Checkout can spend into the shielded pool; the
+          API does not replace the protocol.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
@@ -109,7 +111,7 @@ export default function ApiDocsPage() {
             ["Content-Type", "application/json on requests with a body."],
             [
               "Idempotency-Key",
-              "Required on POST /v1/payments. 1–255 chars, retained ≥ 24h.",
+              "Required on POST /v1/payments. 1-255 chars, retained at least 24h.",
             ],
             ["X-Request-Id", "Optional tracing. Response always echoes a request id."],
           ]}
@@ -119,7 +121,7 @@ export default function ApiDocsPage() {
           (<code className="font-mono text-[12px]">pay_</code>,{" "}
           <code className="font-mono text-[12px]">evt_</code>). Dashboard
           session routes under <code className="font-mono text-[12px]">/api/*</code>{" "}
-          are a different control plane — they are not this API.
+          are a different control plane. They are not this API.
         </p>
       </section>
 
@@ -180,7 +182,8 @@ export default function ApiDocsPage() {
             Keep secret keys on your server. Never expose{" "}
             <code className="font-mono text-blue-800">sk_test_</code> or{" "}
             <code className="font-mono text-blue-800">sk_live_</code> in
-            browser code. Supported currencies: USDC, EURC, XLM.
+            browser code. Private settlement on the live testnet pool is native
+            XLM. USDC on the same circuits is on the production roadmap.
           </p>
         </div>
       </section>
@@ -250,13 +253,41 @@ export default function ApiDocsPage() {
       </section>
 
       <section
+        id="assets"
+        className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
+      >
+        <SectionHeading
+          eyebrow="Assets"
+          title="The live shielded pool is native XLM."
+          copy="Payment objects can name a currency. That is not the same as a live private pool for that asset. Do not treat USDC or EURC as shielded-pool settlement today."
+        />
+        <SpecTable
+          columns={["Asset", "Status"]}
+          rows={[
+            [
+              "XLM",
+              "Live on Stellar testnet. Native SAC pool CB2SVTMG... Browser proving, private checkout, and indexed transfers.",
+            ],
+            [
+              "USDC",
+              "Planned on the existing privacy circuits. Not a deployed shielded pool. Checkout and treasury will wire it after the USDC testnet pool is verified.",
+            ],
+            [
+              "EURC",
+              "May appear as a payment-object currency for classic Stellar checkout. Not a live Hypertron shielded-pool asset.",
+            ],
+          ]}
+        />
+      </section>
+
+      <section
         id="environments"
         className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
       >
         <SectionHeading
           eyebrow="Environments"
           title="Test first. Move live deliberately."
-          copy="A key only accesses data created in its own environment. Testnet checkout still hits the live testnet pool (CB2SVTMG…) when privacy is on — see the protocol page for that trust model."
+          copy="A key only accesses data created in its own environment. Testnet checkout still hits the live native-XLM testnet pool (CB2SVTMG...) when privacy is on. See the protocol page for that trust model."
         />
         <div className="mt-8 overflow-hidden border border-[#dfe5ed] bg-white">
           <div className="grid grid-cols-[110px_minmax(0,1fr)] border-b border-[#e5e9f0] px-5 py-4 text-xs sm:grid-cols-[160px_1fr_1fr]">
@@ -283,7 +314,10 @@ export default function ApiDocsPage() {
             Privacy protocol →
           </Link>
           <Link href="/docs/platform" className="text-blue-600">
-            Platform →
+            Merchant payments →
+          </Link>
+          <Link href="/docs/tooling" className="text-blue-600">
+            Developer tooling →
           </Link>
         </div>
       </section>

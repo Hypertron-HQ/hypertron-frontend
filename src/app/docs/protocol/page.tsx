@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 const toc = [
   { href: "#status", label: "Deployment status" },
   { href: "#what", label: "What this is" },
+  { href: "#ecosystem", label: "Where it fits" },
   { href: "#crypto", label: "Cryptographic backend" },
   { href: "#notes", label: "Notes and keys" },
   { href: "#view", label: "Spend vs view" },
@@ -24,6 +25,7 @@ const toc = [
   { href: "#transfer-n", label: "TransferN" },
   { href: "#vk", label: "VK IDs and testnet" },
   { href: "#indexer", label: "Indexer and DA" },
+  { href: "#compliance", label: "Compliance" },
   { href: "#roadmap", label: "Production hardening" },
 ] as const;
 
@@ -32,7 +34,7 @@ cm       = Poseidon(Poseidon(owner_pk, k), v)
 nf       = Poseidon(spend_sk, k)`;
 
 const transferN = `// N ∈ {2, 4}. No dummy-input padding.
-Public:  [root, nf_1 … nf_N, out_cm1, out_cm2]
+Public:  [root, nf_1 ... nf_N, out_cm1, out_cm2]
 Private: [spend_sk,
           for each input i: k_i, v_i, Merkle path,
           owner_pk1, k1, v1, owner_pk2, k2, v2]
@@ -105,13 +107,13 @@ export default function ProtocolDocsPage() {
           copy="The interesting object is the pool: notes, nullifiers, a recent-root window, and on-chain pairing checks. Application layers reuse this tree. They do not get a private anonymity set."
         />
         <p className="mt-6 max-w-2xl text-sm leading-6 text-[#667085]">
-          Stellar has an existing research primitive in this class — SDF
+          Stellar already has a research primitive in this class. SDF
           commissioned shielded-payment protocol work (SPP) that showed a
           Groth16 pool is viable on this network. Hypertron is a CAP-0059
           deployment of that construction: live testnet contracts, browser
           proving, an indexer for leaf availability, and merchant-facing
-          layers on the same note set. Cite the primitive. This page describes
-          Hypertron&apos;s circuits and contracts, not a comparison.
+          layers on the same note set. We cite that primitive. We are not
+          competing with it.
         </p>
         <SpecTable
           columns={["Component", "Responsibility"]}
@@ -134,7 +136,7 @@ export default function ProtocolDocsPage() {
             ],
             [
               "contracts/compliance",
-              "Optional allow/deny at transparent exit only. Not on private transfer.",
+              "Optional allow/deny. Live testnet pool has compliance: null. The hook runs at unshield only, not on deposit or private transfer.",
             ],
             [
               "prover + prover-wasm",
@@ -149,7 +151,56 @@ export default function ProtocolDocsPage() {
         <p className="mt-5 text-xs leading-5 text-[#98a2b3]">
           The transfer pool is the only authority that may insert commitments or
           mark nullifiers spent. Verifier-key administration can replace a
-          registered VK with no timelock.
+          registered VK with no timelock. The compliance address is fixed at
+          initialize; the live pool cannot be retrofitted with a policy.
+        </p>
+      </section>
+
+      <section
+        id="ecosystem"
+        className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
+      >
+        <SectionHeading
+          eyebrow="Ecosystem"
+          title="Hypertron sits above the primitives. It does not replace them."
+          copy="Stellar already has privacy building blocks. We are not trying to win by inventing another cryptographic primitive. We are trying to make private settlement usable by businesses and applications."
+        />
+        <SpecTable
+          columns={["Project", "Relationship"]}
+          rows={[
+            [
+              "Stellar Private Payments",
+              "Prior art for shielded payments. Closest infrastructure comparison. We cite it; we do not claim a better circuit.",
+            ],
+            [
+              "Confidential Tokens",
+              "Different model: amounts can be hidden while counterparties stay visible. Complementary, not a substitute for a pool.",
+            ],
+            [
+              "LumenShade, Moonlight",
+              "Other privacy-pool and transaction architectures. Same problem class, separate deployments.",
+            ],
+            [
+              "Arcane",
+              "Confidential infrastructure for institutional use. Adjacent positioning, not a pool we wrap.",
+            ],
+            [
+              "Fairblock",
+              "Confidentiality via threshold encryption. Different trust assumptions than a Groth16 setup.",
+            ],
+            [
+              "Blend, XOXNO",
+              "Public credit markets on purpose. Collateral, oracles, and liquidations need transparency. A merchant can still collect or repay through Hypertron without publishing the customer or invoice amount.",
+            ],
+          ]}
+        />
+        <p className="mt-6 max-w-2xl text-sm leading-6 text-[#667085]">
+          What Hypertron adds is the composable layer on top: checkout, APIs,
+          relaying, merchant workflows, selective disclosure, and compliance
+          controls. A wallet should get a private-send option. A DEX should
+          settle a trade privately. A payroll app should send confidential
+          stablecoin payments. A merchant should add private checkout without
+          learning circuits.
         </p>
       </section>
 
@@ -196,20 +247,20 @@ export default function ProtocolDocsPage() {
         <CodeBlock label="Note algebra">{noteMath}</CodeBlock>
         <ul className="mt-6 max-w-2xl space-y-2 text-sm leading-6 text-[#667085]">
           <li>
-            <code className="font-mono text-[12px] text-[#101828]">spend_sk</code>{" "}
-            — secret required to spend. Never encrypted into viewing blobs.
+            <code className="font-mono text-[12px] text-[#101828]">spend_sk</code>
+            : secret required to spend. Never encrypted into viewing blobs.
           </li>
           <li>
-            <code className="font-mono text-[12px] text-[#101828]">owner_pk</code>{" "}
-            — public receiving material. Deposit does not require the spend key.
+            <code className="font-mono text-[12px] text-[#101828]">owner_pk</code>
+            : public receiving material. Deposit does not require the spend key.
           </li>
           <li>
-            <code className="font-mono text-[12px] text-[#101828]">k</code> —
+            <code className="font-mono text-[12px] text-[#101828]">k</code>:
             per-note blinding. Reused k under the same spend key collides
             nullifiers.
           </li>
           <li>
-            <code className="font-mono text-[12px] text-[#101828]">v</code> —
+            <code className="font-mono text-[12px] text-[#101828]">v</code>:
             value. Spent input value is constrained by conservation, not a
             second bit decomposition.
           </li>
@@ -286,7 +337,7 @@ export default function ProtocolDocsPage() {
             ],
             [
               "TransferN 4-in/2-out · VK 5",
-              "[root, nf_1…nf_4, out_cm1, out_cm2]",
+              "[root, nf_1...nf_4, out_cm1, out_cm2]",
               "Consolidation in-circuit. 4-in browser proving time is not published.",
             ],
           ]}
@@ -340,7 +391,7 @@ export default function ProtocolDocsPage() {
         <SectionHeading
           eyebrow="Testnet · 15 Aug 2026"
           title="The pool that is actually live."
-          copy="Pool, commitment, and nullifier were redeployed for multi-input transfer (fresh Merkle tree). Verifier CCHSL7YS… was kept; VK ids 4 and 5 were registered on it."
+          copy="Pool, commitment, and nullifier were redeployed for multi-input transfer (fresh Merkle tree). Verifier CCHSL7YS... was kept; VK ids 4 and 5 were registered on it."
         />
         <SpecTable
           columns={["Role", "Contract"]}
@@ -371,9 +422,39 @@ export default function ProtocolDocsPage() {
           <code className="font-mono text-[12px]">deployments/testnet.json</code>{" "}
           or its author. The{" "}
           <code className="font-mono text-[12px]">VkRegistered</code> event
-          carries only the vk_id, not the key hash — observers must re-run the
+          carries only the vk_id, not the key hash. Observers must re-run the
           script after any admin action.
         </p>
+        <SpecTable
+          columns={["Circuit", "VK id", "Registration transaction"]}
+          rows={[
+            [
+              "deposit",
+              "1",
+              "d4c418d5a03829e969454197d5beea10eedf51ee47b00d52f04d97d89d1b64f1",
+            ],
+            [
+              "unshield",
+              "2",
+              "331bf6cac8bf4fc22b268e7f76ab7b196ffc1e42dbf05a972f3c7f3da7e91a87",
+            ],
+            [
+              "transfer 1-in",
+              "3",
+              "ae7b17f54cc321816bbae76241ffe807392036201806ecd76aa0afa306e7e21b",
+            ],
+            [
+              "transfer-2",
+              "4",
+              "5fed6018a16180512df7a5962f8823ab30039d717b36d1b88f4ed21ba1f39f9d",
+            ],
+            [
+              "transfer-4",
+              "5",
+              "66b20e8d0ad43ba8a5fdd1c35679f2a96f8018c4a6fd43a13e9f99745656bc3e",
+            ],
+          ]}
+        />
         <p className="mt-4">
           <a
             href="https://lab.stellar.org/r/testnet/contract/CB2SVTMGQKQVLUHWC5J7K5NOHPXULWEJL452B457NCRW7OKJ42XSVOLL"
@@ -420,6 +501,47 @@ export default function ProtocolDocsPage() {
       </section>
 
       <section
+        id="compliance"
+        className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
+      >
+        <SectionHeading
+          eyebrow="Compliance"
+          title="B2B private settlement, not a mixer."
+          copy="Privacy applies inside the shielded pool. Deposits and withdrawals remain visible on the public Stellar ledger. Identity and sanctions data stay at the application boundary. They are not circuit inputs."
+        />
+        <ul className="mt-6 max-w-2xl space-y-3 text-sm leading-6 text-[#667085]">
+          <li>
+            The live testnet pool is intentionally open for protocol testing:{" "}
+            <code className="font-mono text-[12px] text-[#101828]">
+              compliance: null
+            </code>
+            . The existing policy hook is evaluated at unshield / exit only.{" "}
+            <code className="font-mono text-[12px] text-[#101828]">deposit</code>{" "}
+            has no compliance check.
+          </li>
+          <li>
+            Production will use allowlist mode so participation is explicitly
+            approved rather than permitted by default. KYB completes before a
+            merchant is enabled for private checkout. Applicable sanctions
+            screening runs on relevant merchant and public transaction
+            addresses.
+          </li>
+          <li>
+            The funded path adds the corresponding deposit / entry check so
+            policy can control both entry and exit. The live pool cannot be
+            retrofitted: initialize is write-once, so mainnet is a fresh
+            deployment with the policy attached from the first ledger.
+          </li>
+          <li>
+            Hypertron will not store identity documents. The system retains
+            provider, decision, reference ID, approver, and timestamp. Documents
+            stay with the verification provider. Viewing secrets never leave the
+            user&apos;s browser.
+          </li>
+        </ul>
+      </section>
+
+      <section
         id="roadmap"
         className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
       >
@@ -441,7 +563,7 @@ export default function ProtocolDocsPage() {
             ],
             [
               "Confidential checkout",
-              "If notes do not cover, checkout still has a transparent deposit path. Remove that fallback.",
+              "If notes do not cover, checkout still has a transparent deposit path. Remove that fallback; add private top-up.",
             ],
             [
               "Client Merkle check",
@@ -449,19 +571,47 @@ export default function ProtocolDocsPage() {
             ],
             [
               "Relayer",
-              "ABI allows relayed transfer. No production relayer yet, so the submitter is public.",
+              "ABI allows relayed transfer. No production relayer yet, so the submitter is public. Next: CAP-0015 fee-sponsored relayer.",
             ],
             [
               "Proof-bound blobs",
-              "Commitments are bound. Ciphertext is not. Bind or authenticate note blobs.",
+              "Commitments are bound. Ciphertext is not. Bind or authenticate note blobs on-chain.",
+            ],
+            [
+              "VK administration",
+              "An existing VK ID can be overwritten with no timelock. Next: append-only registration, timelocks, and key hashes in events.",
+            ],
+            [
+              "Monitoring and threat model",
+              "Not a published operational plan. Next: STRIDE coverage mapped to on-chain monitors, owners, and responses.",
+            ],
+            [
+              "State recovery and TTL",
+              "Unshield emits no encrypted change blob. Persistent roots, leaves, nullifiers, and VKs need active rent management.",
+            ],
+            [
+              "KYB allowlist",
+              "Live pool has compliance: null; hook is unshield-only. Next: deposit-path check, allowlist mode, KYB before private checkout.",
+            ],
+            [
+              "Invoice-bound disclosure",
+              "Viewing-key export only. Next: payment-specific receipts an auditor can verify without a spend key.",
+            ],
+            [
+              "USDC private settlement",
+              "Live pool is native XLM. Next: same circuits, a verified USDC pool, wired into checkout and treasury.",
+            ],
+            [
+              "Protocol freeze",
+              "Testnet artifacts, not a frozen production release. Next: reproducible contract, prover, and WASM hashes.",
             ],
             [
               "Ceremony and audit",
-              "Single-coordinator setup. Next: multi-party ceremony, published transcripts, independent audit.",
+              "Single-coordinator setup. Mainnet is gated on a multi-party ceremony and an independent audit, not on shipping the current keys.",
             ],
             [
               "Mainnet",
-              "After frozen circuits, ceremony, audit, and proving benchmarks.",
+              "After frozen circuits, ceremony, audit, and proving benchmarks. Fresh XLM and USDC contracts; allowlist from the first ledger.",
             ],
           ]}
         />
@@ -470,7 +620,10 @@ export default function ProtocolDocsPage() {
             Payments API →
           </Link>
           <Link href="/docs/platform" className="text-blue-600">
-            Platform →
+            Merchant payments →
+          </Link>
+          <Link href="/docs/tooling" className="text-blue-600">
+            Developer tooling →
           </Link>
           <a
             href="https://github.com/Hypertron-HQ/hypertron-contracts/blob/main/docs/SECURITY.md"
