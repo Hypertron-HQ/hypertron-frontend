@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, BookOpen } from "lucide-react";
 import { getDeveloperApiBaseUrl } from "@/lib/developer-api";
+import { useActiveDocsSection } from "./use-active-docs-section";
 
 export type DocsNavChild = { href: string; label: string };
 
@@ -25,7 +28,7 @@ export const DOCS_NAV: readonly DocsNavSection[] = [
         label: "What Hypertron is",
         children: [
           { href: "#overview", label: "Overview" },
-          { href: "#layers", label: "Three layers" },
+          { href: "#layers", label: "Four layers" },
         ],
       },
     ],
@@ -39,6 +42,7 @@ export const DOCS_NAV: readonly DocsNavSection[] = [
         children: [
           { href: "#status", label: "Deployment status" },
           { href: "#what", label: "What this is" },
+          { href: "#ecosystem", label: "Where it fits" },
           { href: "#crypto", label: "Cryptographic backend" },
           { href: "#notes", label: "Notes and keys" },
           { href: "#view", label: "Spend vs view" },
@@ -47,23 +51,25 @@ export const DOCS_NAV: readonly DocsNavSection[] = [
           { href: "#transfer-n", label: "TransferN" },
           { href: "#vk", label: "VK IDs and testnet" },
           { href: "#indexer", label: "Indexer and DA" },
+          { href: "#compliance", label: "Compliance" },
           { href: "#roadmap", label: "Production hardening" },
         ],
       },
     ],
   },
   {
-    label: "Platform",
+    label: "Merchant",
     items: [
       {
         href: "/docs/platform",
-        label: "Workspace",
+        label: "Merchant payments",
         children: [
           { href: "#overview", label: "What the platform is" },
           { href: "#workspace", label: "Surfaces" },
           { href: "#accept", label: "Accept" },
           { href: "#treasury", label: "Treasury" },
           { href: "#disclose", label: "Disclose" },
+          { href: "#kyb", label: "KYB and allowlist" },
           { href: "#trust", label: "What it is not" },
         ],
       },
@@ -81,7 +87,22 @@ export const DOCS_NAV: readonly DocsNavSection[] = [
           { href: "#quickstart", label: "Quickstart" },
           { href: "#lifecycle", label: "Payment lifecycle" },
           { href: "#webhooks", label: "Webhooks" },
+          { href: "#assets", label: "Assets" },
           { href: "#environments", label: "Environments" },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Tooling",
+    items: [
+      {
+        href: "/docs/tooling",
+        label: "Developer tooling",
+        children: [
+          { href: "#direction", label: "Direction" },
+          { href: "#surfaces", label: "What will ship" },
+          { href: "#today", label: "What exists today" },
         ],
       },
     ],
@@ -126,6 +147,14 @@ export function DocsShell({
 }) {
   const apiBase = getDeveloperApiBaseUrl();
   const headings = toc ?? pageToc(pathname);
+  const activeSection = useActiveDocsSection(headings.map((item) => item.href));
+
+  useEffect(() => {
+    const el = document.querySelector(
+      `[data-docs-outline="${CSS.escape(activeSection)}"]`,
+    );
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeSection]);
 
   return (
     <div className="surface-light min-h-svh bg-[#f6f8fb] text-[#172033]">
@@ -195,19 +224,28 @@ export function DocsShell({
                             {item.label}
                           </Link>
                           <div className="mt-0.5 space-y-0.5 border-l border-[#e8edf3] pl-3">
-                            {item.children.map((child) => (
-                              <Link
-                                key={`${item.href}${child.href}`}
-                                href={`${item.href}${child.href}`}
-                                className={`block py-1 pl-3 text-[12px] leading-4 transition-colors ${
-                                  active
-                                    ? "text-[#667085] hover:text-blue-600"
-                                    : "text-[#98a2b3] hover:text-[#344054]"
-                                }`}
-                              >
-                                {child.label}
-                              </Link>
-                            ))}
+                            {item.children.map((child) => {
+                              const sectionActive =
+                                active && child.href === activeSection;
+                              return (
+                                <Link
+                                  key={`${item.href}${child.href}`}
+                                  href={`${item.href}${child.href}`}
+                                  aria-current={
+                                    sectionActive ? "location" : undefined
+                                  }
+                                  className={`block py-1 pl-3 text-[12px] leading-4 transition-colors ${
+                                    sectionActive
+                                      ? "font-medium text-blue-600"
+                                      : active
+                                        ? "text-[#667085] hover:text-blue-600"
+                                        : "text-[#98a2b3] hover:text-[#344054]"
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -251,7 +289,14 @@ export function DocsShell({
                       <a
                         key={`${item.href}${child.href}`}
                         href={child.href}
-                        className="shrink-0 border border-[#e8edf3] bg-[#fbfcfe] px-3 py-2 text-xs text-[#667085]"
+                        aria-current={
+                          child.href === activeSection ? "location" : undefined
+                        }
+                        className={`shrink-0 border px-3 py-2 text-xs ${
+                          child.href === activeSection
+                            ? "border-blue-600 bg-white font-medium text-blue-600"
+                            : "border-[#e8edf3] bg-[#fbfcfe] text-[#667085]"
+                        }`}
                       >
                         {child.label}
                       </a>
@@ -263,29 +308,41 @@ export function DocsShell({
           {children}
           <footer className="mt-20 flex flex-col gap-4 border-t border-[#dfe5ed] py-8 text-xs text-[#98a2b3] sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Hypertron Labs</span>
-            <div className="flex gap-5">
+            <div className="flex flex-wrap gap-5">
               <Link href="/">Home</Link>
               <Link href="/docs/protocol">Protocol</Link>
+              <Link href="/docs/platform">Merchant</Link>
+              <Link href="/docs/api">API</Link>
+              <Link href="/docs/tooling">Tooling</Link>
               <Link href="/developers">Developer console</Link>
             </div>
           </footer>
         </main>
 
         <aside className="hidden xl:block">
-          <div className="sticky top-16 px-7 py-10">
+          <div className="sticky top-16 h-[calc(100svh-4rem)] overflow-y-auto px-7 py-10">
             <p className="text-[10px] font-semibold tracking-[0.16em] text-[#98a2b3] uppercase">
               On this page
             </p>
-            <nav className="mt-4 space-y-2.5 text-xs text-[#7b8493]">
-              {headings.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className="block transition-colors hover:text-blue-600"
-                >
-                  {item.label}
-                </a>
-              ))}
+            <nav className="mt-4 space-y-1 text-xs" aria-label="On this page">
+              {headings.map((item) => {
+                const sectionActive = item.href === activeSection;
+                return (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    data-docs-outline={item.href}
+                    aria-current={sectionActive ? "location" : undefined}
+                    className={`block border-l py-1 pl-3 leading-4 transition-colors ${
+                      sectionActive
+                        ? "border-blue-600 font-medium text-[#101828]"
+                        : "border-transparent text-[#7b8493] hover:text-blue-600"
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
             </nav>
           </div>
         </aside>

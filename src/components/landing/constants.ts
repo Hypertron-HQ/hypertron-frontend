@@ -169,9 +169,9 @@ export const FAQS = [
   {
     question: "What assets and networks does Hypertron support?",
     answer: [
-      "Hypertron is built on the Stellar network and is designed around Stellar assets and Soroban smart contracts. Current supported assets, payment methods, and environments are listed in the documentation.",
+      "Hypertron is built on Stellar and Soroban. The live shielded pool on testnet is native XLM. USDC on the same privacy circuits is on the production roadmap. Payment-object currencies are listed in the docs and are not the same as a live private pool.",
     ],
-    link: { href: "/docs/api#environments", label: "View supported assets" },
+    link: { href: "/docs/api#assets", label: "View supported assets" },
   },
   {
     question: "Is Hypertron live?",

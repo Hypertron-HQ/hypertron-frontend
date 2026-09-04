@@ -18,6 +18,7 @@ const toc = [
   { href: "#accept", label: "Accept" },
   { href: "#treasury", label: "Treasury" },
   { href: "#disclose", label: "Disclose" },
+  { href: "#kyb", label: "KYB and allowlist" },
   { href: "#trust", label: "What it is not" },
 ] as const;
 
@@ -26,17 +27,17 @@ export default function PlatformDocsPage() {
     <DocsShell pathname="/docs/platform" toc={toc}>
       <section id="overview" className="scroll-mt-28">
         <p className="text-[10px] font-semibold tracking-[0.18em] text-blue-600 uppercase">
-          Platform
+          Merchant payments
         </p>
         <h1 className="mt-4 max-w-3xl font-display text-[clamp(2.4rem,6vw,4.4rem)] leading-[0.92] font-medium tracking-[-0.05em] text-[#101828]">
           Operate the pool without becoming the prover.
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-[#5d6879]">
-          The workspace is the application layer on top of the privacy
-          protocol. Finance teams create payment requests, watch settlement,
-          hold shielded balances, and export records to an auditor — without
-          deploying contracts or managing proving keys. Every payment still
-          lands in the same Merkle tree described in the protocol docs.
+          A business should be able to add private stablecoin payments without
+          understanding circuits, proving systems, or Soroban internals. The
+          workspace is that layer: payment links, hosted checkout, private
+          settlement, treasury activity, and payment monitoring. Every payment
+          still lands in the same Merkle tree described in the protocol docs.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
@@ -144,9 +145,46 @@ export default function PlatformDocsPage() {
         <p className="mt-6 max-w-2xl text-sm leading-6 text-[#667085]">
           Current export is auditor-grade viewing material, not bookkeeper-grade
           reconciliation and not a proof that invoice X settled for amount Y
-          without revealing the pool. Those proofs are not in the protocol
-          yet.
+          without revealing the pool. Invoice-bound viewing receipts (a
+          third party verifies one payment, confirms the export contains no
+          spend key) are the next disclosure product. They are not in the
+          protocol yet.
         </p>
+      </section>
+
+      <section
+        id="kyb"
+        className="scroll-mt-28 mt-20 border-t border-[#dfe5ed] pt-16"
+      >
+        <SectionHeading
+          eyebrow="Production policy"
+          title="KYB before private checkout. Allowlist, not open entry."
+          copy="The current testnet pool is open for protocol testing. Production merchant participation is explicitly approved. Privacy inside the pool does not mean anonymous onboarding at the edge."
+        />
+        <ul className="mt-6 max-w-2xl space-y-3 text-sm leading-6 text-[#667085]">
+          <li>
+            KYB verification completes before a merchant is enabled for private
+            checkout. Applicable sanctions screening runs on merchant and
+            public transaction addresses. Offboarding revokes checkout and
+            allowlist membership; it cannot freeze notes already in the pool.
+          </li>
+          <li>
+            Production uses allowlist mode so addresses are approved rather
+            than permitted by default. The live testnet pool has no policy
+            attached (
+            <code className="font-mono text-[12px] text-[#101828]">
+              compliance: null
+            </code>
+            ). Entry checks on deposit are not shipped; today the hook is
+            unshield-only.
+          </li>
+          <li>
+            Hypertron will not store identity documents. Provider, decision,
+            reference ID, approver, and timestamp are retained. Documents stay
+            with the KYB provider. Compliance information is separate from
+            spending authority.
+          </li>
+        </ul>
       </section>
 
       <section
@@ -156,7 +194,7 @@ export default function PlatformDocsPage() {
         <SectionHeading
           eyebrow="Boundary"
           title="The workspace is not the trusted core."
-          copy="Dashboard, payment-link APIs, and viewing-key export can fail or lie without minting a note. Validity is Groth16 verification plus the commitment and nullifier contracts."
+          copy="Dashboard, payment-link APIs, and viewing-key export can fail or lie without minting a note. Validity is Groth16 verification plus the commitment and nullifier contracts. Hypertron is not a mixer."
         />
         <SpecTable
           columns={["In the platform", "Not in the platform"]}
@@ -171,7 +209,11 @@ export default function PlatformDocsPage() {
             ],
             [
               "Viewing-key auditor export",
-              "Invoice-bound ZK receipts, SEP-6 / SEP-24 fiat ramps",
+              "Invoice-bound ZK receipts (upcoming), SEP-6 / SEP-24 fiat ramps",
+            ],
+            [
+              "KYB decision metadata (provider, result, reference)",
+              "Identity documents, in-circuit sanctions checks, seizing notes in the pool",
             ],
           ]}
         />
@@ -181,6 +223,9 @@ export default function PlatformDocsPage() {
           </Link>
           <Link href="/docs/api" className="text-blue-600">
             Payments API →
+          </Link>
+          <Link href="/docs/tooling" className="text-blue-600">
+            Developer tooling →
           </Link>
         </div>
       </section>
