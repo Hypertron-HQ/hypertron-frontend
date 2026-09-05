@@ -122,12 +122,13 @@ function pageToc(pathname: string): readonly DocsNavChild[] {
 
 function LogoMark() {
   return (
-    <span aria-hidden className="grid grid-cols-2 gap-[2px]">
-      <span className="size-1.5 bg-current" />
-      <span className="size-1.5 bg-current" />
-      <span className="size-1.5 bg-current" />
-      <span className="size-1.5 bg-current" />
-    </span>
+    <img
+      src="/media/logo_black.png"
+      alt=""
+      width={28}
+      height={28}
+      className="size-7 object-contain"
+    />
   );
 }
 
