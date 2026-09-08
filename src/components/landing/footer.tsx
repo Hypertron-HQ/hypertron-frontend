@@ -138,23 +138,8 @@ export function LandingFooter() {
           </div>
 
           {/* legal row */}
-          <div className="relative grid gap-3 border-t border-white/10 py-6 lg:grid-cols-3 lg:gap-0">
-            <div className="hidden lg:block" />
-            <div className="flex items-center gap-6 lg:pl-10">
-              <a
-                href="/privacy"
-                className="text-[10px] tracking-[0.14em] text-white/50 uppercase underline underline-offset-4 transition-colors hover:text-white"
-              >
-                Privacy Policy
-              </a>
-              <a
-                href="/terms"
-                className="text-[10px] tracking-[0.14em] text-white/50 uppercase underline underline-offset-4 transition-colors hover:text-white"
-              >
-                Terms of Use
-              </a>
-            </div>
-            <p className="text-[10px] tracking-[0.14em] text-white/40 uppercase lg:pl-10">
+          <div className="relative border-t border-white/10 py-6">
+            <p className="text-[10px] tracking-[0.14em] text-white/40 uppercase lg:text-right">
               © {new Date().getFullYear()} Hypertron Labs. All rights reserved.
             </p>
           </div>
