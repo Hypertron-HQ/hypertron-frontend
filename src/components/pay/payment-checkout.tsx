@@ -38,6 +38,11 @@ import {
   checkPaymentLinkStatus,
   type PublicPaymentLink,
 } from "@/lib/payment-links";
+import {
+  checkoutReturnWithTx,
+  safeCheckoutReturnUrl,
+  waitForSuccessfulTransaction,
+} from "@/lib/checkout-return";
 import { buildClassicPaymentXdr } from "@/lib/stellar-classic-pay";
 import {
   getPaymentPoolAddress,
@@ -462,9 +467,22 @@ export function PaymentCheckout({ linkId }: Props) {
           link.id,
           submitted.hash,
         );
-        if (statusCheck.ok && statusCheck.status === "paid") {
-          const refreshed = await getPublicPaymentLink(link.id);
-          if (refreshed.ok) setLink(refreshed.link);
+        const paidByApi = statusCheck.ok && statusCheck.status === "paid";
+        const paidOnChain =
+          paidByApi || (await waitForSuccessfulTransaction(submitted.hash));
+        if (paidOnChain) {
+          if (paidByApi) {
+            const refreshed = await getPublicPaymentLink(link.id);
+            if (refreshed.ok) setLink(refreshed.link);
+          }
+          const returnUrl = safeCheckoutReturnUrl(
+            new URLSearchParams(window.location.search).get("return"),
+          );
+          if (returnUrl) {
+            setStatus("Payment confirmed. Returning to your NFTs…");
+            window.location.assign(checkoutReturnWithTx(returnUrl, submitted.hash));
+            return;
+          }
           setStatus("Payment confirmed.");
         } else {
           setStatus("Payment submitted. Awaiting confirmation…");
