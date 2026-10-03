@@ -449,7 +449,7 @@ export function PaymentCheckout({ linkId }: Props) {
           return;
         }
         setStatus("Sign in Freighter…");
-        const submitted = await signAndSubmitXdr(built.xdr);
+        const submitted = await signAndSubmitXdr(built.xdr, wallet);
         if (!submitted.ok) {
           setError(submitted.error);
           setBusy(false);
