@@ -124,7 +124,11 @@ export function LandingNavbar() {
         </nav>
 
         <div className="landing-launch">
-          <FreighterSignupDialog triggerLabel="Launch app" />
+          <FreighterSignupDialog
+            triggerLabel="Launch app"
+            description="Connect your onchain wallet and sign a one-time challenge to continue."
+            walletCaption="Onchain browser wallet"
+          />
           <ArrowUpRight
             aria-hidden
             className="landing-launch-arrow pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2"

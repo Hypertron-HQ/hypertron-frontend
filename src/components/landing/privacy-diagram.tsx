@@ -121,16 +121,9 @@ export function PrivacyDiagram() {
           Settlement
         </p>
         <div className="border border-dashed border-white/30 bg-white/[0.025] px-6 py-4 backdrop-blur-sm">
-          <div className="flex items-center justify-center gap-2.5">
-            <img
-              src="/media/stellar-blockchain.jpeg"
-              alt=""
-              className="size-5 rounded-full object-cover grayscale"
-            />
-            <p className="landing-hero-title text-[18px] tracking-[-0.02em] text-white/80">
-              Stellar
-            </p>
-          </div>
+          <p className="landing-hero-title text-[18px] tracking-[-0.02em] text-white/80">
+            Settlement layer on-chain
+          </p>
         </div>
       </div>
 

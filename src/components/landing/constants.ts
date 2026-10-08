@@ -10,7 +10,7 @@ export const PRODUCT_COPY =
 export const PRODUCT_FEATURES = [
   {
     title: "Accept",
-    copy: "Payment links and hosted checkout for private Stellar payments.",
+    copy: "Payment links and hosted checkout for private onchain payments.",
   },
   {
     title: "Manage",
@@ -104,7 +104,7 @@ export const FAQS = [
   {
     question: "What is Hypertron?",
     answer: [
-      "Hypertron is private payment infrastructure for Stellar. Businesses can accept and operate private payments through the platform. Developers can integrate private checkout through the API, or call Hypertron privacy infrastructure from their own Soroban applications.",
+      "Hypertron is private onchain payment infrastructure. Businesses can accept and operate private payments through the platform. Developers can integrate private checkout through the API, or call Hypertron privacy infrastructure from their own Soroban applications.",
     ],
   },
   {
@@ -141,7 +141,7 @@ export const FAQS = [
   {
     question: "What does Hypertron make private?",
     answer: [
-      "Hypertron is designed to reduce unnecessary exposure of payment information on the public ledger. Depending on the flow, details such as amounts and counterparties can stay private while Stellar settlement remains verifiable.",
+      "Hypertron is designed to reduce unnecessary exposure of payment information on the public ledger. Depending on the flow, details such as amounts and counterparties can stay private while onchain settlement remains verifiable.",
       "Privacy is not invisibility. Relevant information can be disclosed when required through selective disclosure.",
     ],
   },
@@ -169,7 +169,7 @@ export const FAQS = [
   {
     question: "What assets and networks does Hypertron support?",
     answer: [
-      "Hypertron is built on Stellar and Soroban. The live shielded pool on testnet is native XLM. USDC on the same privacy circuits is on the production roadmap. Payment-object currencies are listed in the docs and are not the same as a live private pool.",
+      "Hypertron is built onchain and Soroban. The live shielded pool on testnet is native XLM. USDC on the same privacy circuits is on the production roadmap. Payment-object currencies are listed in the docs and are not the same as a live private pool.",
     ],
     link: { href: "/docs/api#assets", label: "View supported assets" },
   },
