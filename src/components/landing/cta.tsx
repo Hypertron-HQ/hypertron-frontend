@@ -20,7 +20,7 @@ export function LandingCta() {
                 </h2>
                 <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#5c6778]">
                   Start with the platform, integrate the infrastructure, or
-                  connect through the API. One rail on Stellar.
+                  connect through the API. One rail onchain.
                 </p>
               </div>
 
@@ -28,6 +28,8 @@ export function LandingCta() {
                 <FreighterSignupDialog
                   triggerLabel="Launch app"
                   triggerClassName="h-12 rounded-none bg-[#0b1220] px-7 text-[11px] font-semibold tracking-[0.16em] text-white uppercase hover:bg-black"
+                  description="Connect your onchain wallet and sign a one-time challenge to continue."
+                  walletCaption="Onchain browser wallet"
                 />
                 <div className="flex flex-wrap gap-3">
                   <a

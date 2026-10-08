@@ -55,18 +55,8 @@ export function LandingFooter() {
                 production ready.
               </p>
               <p className="mt-5 max-w-[15rem] text-[13px] leading-relaxed text-white/50">
-                One stack on Stellar for merchants, application developers, and
+                One stack onchain for merchants, application developers, and
                 protocol teams.
-              </p>
-              <p className="mt-8 inline-flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/45 uppercase">
-                <img
-                  src="/media/stellar-blockchain.jpeg"
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="size-4 rounded-full object-cover"
-                />
-                Built on Stellar
               </p>
             </div>
 

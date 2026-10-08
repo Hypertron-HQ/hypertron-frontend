@@ -52,7 +52,7 @@ function FaqExtras({
             Privacy infrastructure
           </p>
           <p className="mt-2 tracking-[0.16em] text-[#1c2433] uppercase">
-            Stellar
+            Onchain
           </p>
         </div>
       ) : null}

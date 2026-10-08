@@ -246,18 +246,10 @@ export function EcosystemDiagram() {
       <div className="mx-auto h-8 w-px bg-[repeating-linear-gradient(180deg,#8db8f4_0_2px,transparent_2px_6px)] opacity-60" />
 
       <div style={fadeUp(640)}>
-        <div className="flex items-center justify-center gap-3 border border-[#b8cce4] bg-[#e4eef9] px-5 py-4">
-          <img
-            src="/media/stellar-blockchain.jpeg"
-            alt=""
-            className="size-5 rounded-full object-cover grayscale"
-          />
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-[#1c2433] uppercase">
-              Stellar
-            </p>
-            <p className="mt-0.5 text-[9px] text-[#5b7aa3]">Settlement layer</p>
-          </div>
+        <div className="flex items-center justify-center border border-[#b8cce4] bg-[#e4eef9] px-5 py-4">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-[#1c2433] uppercase">
+            Settlement layer on-chain
+          </p>
         </div>
       </div>
     </div>

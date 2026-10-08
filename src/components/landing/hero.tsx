@@ -278,18 +278,7 @@ export function LandingHero() {
                 </div>
               </div>
 
-              <div className="hero-enter hero-enter-delay-4 grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)_minmax(28rem,40rem)] sm:items-end">
-                <p className="inline-flex items-center gap-2.5 text-[10px] tracking-[0.2em] text-white/55 uppercase">
-                  <img
-                    src="/media/stellar-blockchain.jpeg"
-                    alt=""
-                    width={28}
-                    height={28}
-                    className="size-7 rounded-full object-cover"
-                  />
-                  Built on Stellar
-                </p>
-                <span aria-hidden className="hidden sm:block" />
+              <div className="hero-enter hero-enter-delay-4 ml-auto w-full sm:max-w-[40rem]">
                 <a
                   href={BOOK_DEMO}
                   target="_blank"

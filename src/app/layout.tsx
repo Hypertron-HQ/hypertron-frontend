@@ -18,7 +18,7 @@ const instrument = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Hypertron: Privacy infrastructure for Payments",
   description:
-    "A shielded pool on Stellar for private payments: protocol, API, and workspace on one settlement rail.",
+    "A shielded pool onchain for private payments: protocol, API, and workspace on one settlement rail.",
   icons: {
     icon: [
       {

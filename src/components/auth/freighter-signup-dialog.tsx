@@ -43,6 +43,7 @@ export function FreighterSignupDialog({
   eyebrow = "Create account",
   title = "Sign up with Freighter",
   description = "Connect your Stellar wallet and sign a one-time challenge to continue.",
+  walletCaption = "Stellar browser wallet",
 }: {
   redirectTo?: string;
   triggerLabel?: ReactNode;
@@ -50,6 +51,7 @@ export function FreighterSignupDialog({
   eyebrow?: string;
   title?: string;
   description?: string;
+  walletCaption?: string;
 } = {}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("choose");
@@ -160,7 +162,7 @@ export function FreighterSignupDialog({
                       Freighter
                     </span>
                     <span className="mt-1 block text-[12px] text-white/40">
-                      Stellar browser wallet
+                      {walletCaption}
                     </span>
                   </span>
                   <span className="flex size-8 shrink-0 items-center justify-center border border-white/10 text-white/40 transition-colors group-hover:border-white/30 group-hover:text-white">
